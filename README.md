@@ -13,6 +13,8 @@ Technology stack:
 + FO storage: Redis Stack (Redis packed with modules for Indexing, Searching and JSON processing)
             - https://redis.io/docs/getting-started/
             - https://redis.io/commands/# eifo
+
+
 Quick Start:
 + Install Redis Stack Server
 + Install OpenResty and update $PATH variable to include nginx execution file (nginx is packed inside OpenResty)
