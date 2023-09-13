@@ -1,0 +1,8 @@
+{% layout = "base.template.html" %}
+
+{-main-}
+    <!-- Promotion Carousel -->
+    <section class="bg-white py-8">
+        {(productsByCategory.grid.template.html, {category = category, items = items})}
+    </section>
+{-main-}

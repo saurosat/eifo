@@ -1,0 +1,29 @@
+[{
+  "indexName": "idx:c",
+  "ON": "HASH",
+  "SCHEMA": {
+    "categoryName": {
+      "type": "TEXT",
+      "weight": 1.0
+    },
+    "description": {
+      "type": "TEXT",
+      "weight": 0.8
+    }
+  }
+},
+{
+  "indexName": "idx:p",
+  "ON": "HASH",
+  "SCHEMA": {
+    "productName": {
+      "type": "TEXT",
+      "weight": 1.2
+    },
+    "description": {
+      "type": "TEXT",
+      "weight": 0.8
+    }
+  }
+}
+]
