@@ -3,7 +3,12 @@
 --- Created by tnguyen.
 --- DateTime: 9/7/23 11:54 PM
 ---
----
+if not prevIdx or not nextIdx then
+    prevIdx = function(i, n) if i == 1 then return n else return i - 1 end end
+    nextIdx = function(i, n) if i == n then return 1 else return i + 1 end end
+end
+
+
 local redisAgent = require "resty.redis"
 local redis = redisAgent:new()
 redis:set_timeouts(10000) -- 10 sec
@@ -36,9 +41,20 @@ for i = 1, #productIds do
     end
     products[i] = product
 end
+-- Load promotions:
+local promotions = {{imgLocation="/img/promo1.jpeg", description="Buy one get one free"}, {imgLocation="/img/promo2.jpeg", description="Sale 50% OFF for handsome boys"}, {imgLocation="/img/promo3.jpeg", description="Instant free ship to door"}}
+--local promotionIds redis:smembers("new:promo")
+--for i=1, #promotionIds do
+--    local promoFVs = redis:hgetall(promotionIds[i]) -- return an array of strings
+--    for j = 1, #promoFVs - 1, 2 do
+--        promotions[promoFVs[j]] = promoFVs[j+1]
+--    end
+--end
+
+-- Generate index.html:
 local template = require "resty.template".new({location="/"})
 local func = template.compile("index.template.html", "no-cache")
-local html = func({category = cat, items = products})
+local html = func({category = cat, items = products, promotions = promotions})
 ngx.say(html)
 local basePath = ngx.var.basePath
 local f = assert(io.open(basePath.."/templates/render_temp/index.html", "w"))
@@ -46,6 +62,21 @@ f:write(html)
 f:close()
 os.remove(basePath.."/home/index.html")
 os.rename(basePath.."/templates/render_temp/index.html", basePath.."/home/index.html")
+
+
+
+--[[
+func = template.compile("promotions1.carousel.template.html", "no-cache") -- return a function
+html = func({promotions = promotions}) -- call the returned func to create html string
+ngx.say(html) -- write the html string to output stream (in this case is Response stream)
+local basePath = ngx.var.basePath
+local f = assert(io.open(basePath.."/templates/render_temp/promotions1.html", "w"))
+f:write(html)
+f:close()
+os.remove(basePath.."/home/promotions1.html")
+os.rename(basePath.."/templates/render_temp/promotions1.html", basePath.."/home/promotions1.html")
+]]
+
 -- TODO: generate other pages
 -- Everything is up-to-date:
 --redis:del("new:c")

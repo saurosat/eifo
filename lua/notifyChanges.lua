@@ -3,6 +3,35 @@
 --- Created by tnguyen.
 --- DateTime: 9/2/23 12:06 PM
 ---
+if not eName2Info or ePrefix2Info then
+    eName2Info = {
+        ProductCategory = {
+            id = { "productCategoryId" },
+            prefix = "c",
+            rel1 = {productCategoryTypeEnumId = "enum:ct"}
+        },
+        Product = {
+            id = { "productId" },
+            prefix = "p"
+        },
+        ProductCategoryRollup = {
+            id = {"productCategoryId", "parentProductCategoryId"},
+            prefix = "c2c",
+            rel1 = {productCategoryId = "c", parentProductCategoryId = "c"}
+        },
+        ProductCategoryMember = {
+            id = {"productCategoryId", "productId", "fromDate"},
+            prefix = "c2p",
+            rel1 = {productCategoryId = "c", productId = "p"}
+        },
+        ProductStorePromotion = { prefix = "promo" }
+    }
+    ePrefix2Info = {}
+    for k, v in pairs(eName2Info) do
+        ePrefix2Info[v.prefix] = v
+    end
+
+end
 
 local responseError = function(httpStatus, errMessage)
     ngx.status = httpStatus
@@ -36,9 +65,8 @@ local next = next
 local isTableEmpty = function(tbl)
     return next(tbl) == nil
 end
-local e2hash = {ProductCategory = "c", Product = "p", ProductStorePromotion = "promo"}
 
--- 1. Read Request data:
+    -- 1. Read Request data:
 local readReqData = require "resty.reqargs"
 local getData, postData, fileData = readReqData()
 local reqData = mergeRef(getData, postData)
@@ -53,7 +81,7 @@ if not entityName then
     return
 end
 
-local hashType = e2hash[entityName]
+local hashType = eName2Info[entityName].prefix
 if not hashType then
     responseError(ngx.HTTP_BAD_REQUEST, "Entity '" .. entityName .."' events is not subscribed")
     return
@@ -75,9 +103,9 @@ if not ok then
 end
 
 -- Save data to Redis
-local hash = hashType..":"..id
 local oldTbl = {}
 local newTbl = {}
+local hash = hashType..":"..id
 local oldVals = redis:hgetall(hash)
 if not oldVals or #oldVals == 0 then -- case insert
     printTbl(reqData)
@@ -116,18 +144,13 @@ local noNewVal = isTableEmpty(newTbl)
 -- the case both oldTbl and #newTbl are empty means nothing changes:
 if noOldVal and noNewVal then
     ngx.say("Data is up-to-date. Do nothing")
-    ngx.status = ngx.HTTP_OK
-    return
-end
-
-local hash = hashType..":"..id
-if noNewVal then -- Delete
-    redis:sadd("del:"..hashType, id)
-    redis:hmset("del:"..hash, oldTbl)
-    redis:del(hash)
 elseif noOldVal then -- insert new one
     redis:sadd("new:"..hashType, id)
     redis:hmset(hash, newTbl)
+elseif noNewVal then -- Delete
+    redis:sadd("del:"..hashType, id)
+    redis:hmset("del:"..hash, oldTbl)
+    redis:del(hash)
 else -- update existing one
     redis:sadd("set:"..hashType, id)
     redis:hmset("set:"..hash, oldTbl)
