@@ -3,159 +3,48 @@
 --- Created by tnguyen.
 --- DateTime: 9/2/23 12:06 PM
 ---
-if not eName2Info or ePrefix2Info then
-    eName2Info = {
-        ProductCategory = {
-            id = { "productCategoryId" },
-            prefix = "c",
-            rel1 = {productCategoryTypeEnumId = "enum:ct"}
-        },
-        Product = {
-            id = { "productId" },
-            prefix = "p"
-        },
-        ProductCategoryRollup = {
-            id = {"productCategoryId", "parentProductCategoryId"},
-            prefix = "c2c",
-            rel1 = {productCategoryId = "c", parentProductCategoryId = "c"}
-        },
-        ProductCategoryMember = {
-            id = {"productCategoryId", "productId", "fromDate"},
-            prefix = "c2p",
-            rel1 = {productCategoryId = "c", productId = "p"}
-        },
-        ProductStorePromotion = { prefix = "promo" }
-    }
-    ePrefix2Info = {}
-    for k, v in pairs(eName2Info) do
-        ePrefix2Info[v.prefix] = v
-    end
-
-end
-
-local responseError = function(httpStatus, errMessage)
-    ngx.status = httpStatus
-    ngx.say("{'message':'"..errMessage.."'}")
-    ngx.eof()
-end
-local mergeRef = function(lTable, rTable)
-    if not lTable then
-        return rTable
-    end
-    if not rTable then
-        return lTable
-    end
-    for k,v in pairs(rTable) do
-        lTable[k] = v
-    end
-    return lTable
-end
-local popKey = function(tbl, key)
-    local val = tbl[key]
-    tbl[key] = nil
-    return val
-end
-local printTbl = function(tbl)
-    ngx.say("Table Length:"..#tbl.."<br/>")
-    for k,v in pairs(tbl) do
-        ngx.say (k..": "..v.."<br/>")
-    end
-end
-local next = next
-local isTableEmpty = function(tbl)
-    return next(tbl) == nil
-end
+local utils = require "utils"
 
     -- 1. Read Request data:
 local readReqData = require "resty.reqargs"
 local getData, postData, fileData = readReqData()
-local reqData = mergeRef(getData, postData)
+local reqData = utils.mergeRef(getData, postData)
 if not reqData then
-    responseError(ngx.HTTP_NO_CONTENT, "Request data is missing" + err1)
+    utils.responseError(ngx.HTTP_NO_CONTENT, "Request data is missing"..err1)
     return
 end
-printTbl(reqData)
-local entityName = popKey(reqData, "entityName")
+--utils.printTable(reqData)
+
+local entityName = utils.popKey(reqData, "entityName")
 if not entityName then
-    responseError(ngx.HTTP_BAD_REQUEST, "Entity Name is expected with key 'entityName'")
+    utils.responseError(ngx.HTTP_BAD_REQUEST, "Entity Name is expected with key 'entityName'")
     return
 end
 
-local hashType = eName2Info[entityName].prefix
-if not hashType then
-    responseError(ngx.HTTP_BAD_REQUEST, "Entity '" .. entityName .."' events is not subscribed")
+local ed = require("dao")[entityName]
+if not ed then
+    utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Entity '" .. entityName .."' has no definition")
     return
 end
-local id = popKey(reqData, "id")
-if not id then
-    responseError(ngx.HTTP_BAD_REQUEST, "Entity ID is expected with key 'id'")
+local ev, err = ed:new(reqData)
+if not ev then
+    utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Cannot initiate entity value: "..err)
     return
 end
-
--- Connect to Redis:
-local redisAgent = require "resty.redis"
-local redis = redisAgent:new()
-redis:set_timeouts(1000, 1000, 1000) -- 1 sec
-local ok, errConn = redis:connect("127.0.0.1", 6379)
+local connFactory = require("dbconn")
+local conn = connFactory.redis()
+local ok, err = conn:connect()
+if ok then
+    ok, err = ev:save(conn)
+end
 if not ok then
-    responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "failed to connect to Redis: " + errConn)
-    return
+    utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, err)
+else
+    ngx.status = ngx.HTTP_OK
+    ngx.say("OK!")
 end
+conn:disconnect()
 
--- Save data to Redis
-local oldTbl = {}
-local newTbl = {}
-local hash = hashType..":"..id
-local oldVals = redis:hgetall(hash)
-if not oldVals or #oldVals == 0 then -- case insert
-    printTbl(reqData)
-    if isTableEmpty(reqData) then
-        responseError(ngx.HTTP_BAD_REQUEST, "Cannot DELETE: Entity ID ('"..id.."') does not exist")
-        return
-    end
-    newTbl = reqData
-elseif isTableEmpty(reqData) then -- case delete:
-    for i = 1, #oldVals - 1, 2 do
-        if reqData[oldVals[i]] ~= oldVals[i+1] then
-            oldTbl[oldVals[i]] = oldVals[i+1]
-        end
-    end
-else --case update, check and leave unchanged fields untouched:
-    for i = 1, #oldVals - 1, 2 do
-        if reqData[oldVals[i]] then -- both old and new values exist:
-            if reqData[oldVals[i]] ~= oldVals[i+1] then
-                oldTbl[oldVals[i]] = oldVals[i+1]
-                newTbl[oldVals[i]] = reqData[oldVals[i]]
-            -- else: oldTbl[oldVals[i]] and newTbl[oldVals[i]] is not set
-            end
-            reqData[oldVals[i]] = nil --remove processed key
-        -- elseif not reqData[oldVals[i]] oldTbl[oldVals[i]] and newTbl[oldVals[i]] is not set
-        end
-    end
-    for k, v in pairs(reqData) do -- remained keys in reqData are new keys
-        oldTbl[k] = ""
-        newTbl[k] = v
-    end
-end
-
-local noOldVal = isTableEmpty(oldTbl)
-local noNewVal = isTableEmpty(newTbl)
-
--- the case both oldTbl and #newTbl are empty means nothing changes:
-if noOldVal and noNewVal then
-    ngx.say("Data is up-to-date. Do nothing")
-elseif noOldVal then -- insert new one
-    redis:sadd("new:"..hashType, id)
-    redis:hmset(hash, newTbl)
-elseif noNewVal then -- Delete
-    redis:sadd("del:"..hashType, id)
-    redis:hmset("del:"..hash, oldTbl)
-    redis:del(hash)
-else -- update existing one
-    redis:sadd("set:"..hashType, id)
-    redis:hmset("set:"..hash, oldTbl)
-    redis:hmset(hash, newTbl)
-end
 --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_001&productName=Demo%20One&description=For%Demo1
 --- HASH type: "p:DEMO_001" --> {"productName": "Demo One", "description":"For%Demo1"}
 --- LIST type: "new:p" --> {DEMO_001}
@@ -164,10 +53,7 @@ end
 --- HASH type: "p:DEMO_002" --> {"productName": "Demo Two", "description":"For%Demo2"}
 --- LIST type: "new:p" --> {DEMO_002, DEMO_001}
 
-ngx.status = ngx.HTTP_OK
-ngx.say("OK!")
 ngx.eof()
-redis:set_keepalive(10000, 50) -- maintain 50 connections in connection pool, with 10s timeout
 
     --- TEST DATA ---
     --- curl http://localhost:8090/notifyChanges?entityName=ProductStorePromotion&id=PopcBuyGet&storePromotionId=PopcBuyGet&productStoreId=POPC_DEFAULT&itemDescription=Buy%201%20Get%201%20Half%20Off&serviceRegisterId=BuyGetDiscount&sequenceNum=10&requireCode=Y&useLimitPerOrder=2&useLimitPerCustomer=4&useLimitPerPromotion=10
