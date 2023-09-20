@@ -49,19 +49,12 @@ RW.__index.hget = function(self, key, fields)
 
     if not vals or #vals == 0 then
         return {}
-    else
-        local svals = ""
-        for i = 1, #vals, 1 do
-            if vals[i] then
-                svals = svals..", "..type(vals[i])
-            else
-                svals = svals..", nil"
-            end
-        end
     end
     local retTbl = utils.newTable(0, #fields)
     for i = 1, #fields, 1 do
-        retTbl[fields[i]] = vals[i]
+        if type(vals[i]) ~= "userdata" then
+            retTbl[fields[i]] = vals[i]
+        end
     end
     return retTbl
 end
