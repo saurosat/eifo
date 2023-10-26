@@ -1,0 +1,36 @@
+{% layout = "layout/carousel.view.html" %}
+{- body -}
+{%
+if not prevIdx or not nextIdx then
+  prevIdx = function(i, n) if i == 1 then return n else return i - 1 end end
+  nextIdx = function(i, n) if i == n then return 1 else return i + 1 end end
+end
+local promotions = model.entities.ProductStorePromotion
+local n = #promotions
+for i = 1, n do
+  local iPrev, iNext = prevIdx(i, n), nextIdx(i, n)
+%}
+<input class="carousel-open" type="radio" id="carousel-{{i}}" name="carousel" aria-hidden="true" hidden="" {% if i == 1 then %} checked="checked" {% end %}>
+<div class="carousel-item absolute opacity-0 bg-cover bg-right" style="height:50vh;">
+  <div class="block h-full w-full mx-auto flex pt-6 md:pt-0 md:items-center bg-cover bg-right" style="background-image: url('{{promotions[i].values.imgLocation}}');">
+
+    <div class="container mx-auto">
+      <div class="flex flex-col w-full lg:w-1/2 md:ml-16 items-center md:items-start px-6 tracking-wide">
+        <p class="text-black text-2xl my-4">{{promotions[i].values.itemDescription}}</p>
+        <a class="text-xl inline-block no-underline border-b border-gray-600 leading-relaxed hover:text-black hover:border-black" href="promotions/products/{{promotions[i].values.storePromotionId}}">view product</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+<label for="carousel-{*iPrev*}" class="prev control-{*i*} w-10 h-10 ml-2 md:ml-10 absolute cursor-pointer hidden text-3xl font-bold text-black hover:text-white rounded-full bg-white hover:bg-gray-900  leading-tight text-center z-10 inset-y-0 left-0 my-auto">‹</label>
+<label for="carousel-{*iNext*}" class="next control-{*i*} w-10 h-10 mr-2 md:mr-10 absolute cursor-pointer hidden text-3xl font-bold text-black hover:text-white rounded-full bg-white hover:bg-gray-900  leading-tight text-center z-10 inset-y-0 right-0 my-auto">›</label>
+{% end %}
+{- body -}
+{- indicators -}
+{% for i = 1, #model.entities.ProductStorePromotion do %}
+<li class="inline-block mr-3">
+  <label for="carousel-{{i}}" class="carousel-bullet cursor-pointer block text-4xl text-gray-400 hover:text-gray-900">•</label>
+</li>
+{% end %}
+{- indicators -}

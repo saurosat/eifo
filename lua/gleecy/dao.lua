@@ -12,169 +12,387 @@ end
 if gleecy.db.ed then
     return gleecy.db.ed
 end
-local utils = require "utils"
+local utils = require "gleecy.utils"
+local ngx = ngx
+
 local _EV = {}
 _EV.__index = {
-    load = function(self, conn)
-        self.oldVals = conn:hgetall(self.key) or {}
-        local _, hlen = utils.tbllen(self.oldVals)
-        self.values = self.values or utils.newTable(0, hlen)
+    _attach = utils.observable.__index._attach,
+    _detach = utils.observable.__index._detach,
+    _notify = utils.observable.__index._notify,
+    resetKey = function(self, oldVals)
+        if oldVals then
+            local keyChanged = self:isKeyChanged(oldVals)
+            if keyChanged >= 2 then
+                self.values["key"] = nil -- Delete old key to re-generate
+            end
+        end
 
-        for k, v in pairs(self.oldVals) do
-            if not self.values[k] or self.values[k] == v then
-                self.values[k] = v
-                self.oldVals[k] = nil
-            end
+        if self.values["key"] then
+            return self.values["key"]
         end
-        self.dirty = not utils.isTableEmpty(self.oldVals)
-        return self.oldVals
+
+        self.values["key"] = self.ed:generateKey(self.values)
+        return self.values["key"]
     end,
-    save = function(self, conn, nocommit)
-        local oldVals, err = conn:hset(self.key, self.values)
-        if not oldVals then return nil, err end
-        local sKey
-        local insert = utils.isTableEmpty(oldVals)
-        if insert then -- case insert:
-            sKey = "new:"..self.prefix
-        else -- case update:
-            sKey = "set:"..self.prefix
-        end
-        local num = conn:sadd(sKey, self.key)
-        if num == 0 then
-            num = conn:sismember(sKey, self.key)
-        end
-        if num == 0 then
-            err = "Cannot add tracking key "..sKey
-        else
-            _, err = conn:hset("set:"..self.key, oldVals) -- keep track of oldVals
-        end
-        if err then
-            if not nocommit then
-                conn:rollback()
+
+    --- Replace foreign ID values by foreign key values
+    resetFKeys = function(self, oldVals)
+        if oldVals then
+            local keyChanged = self:isKeyChanged(oldVals)
+            if keyChanged == 0 or keyChanged == 2 then
+                return -- No FK changes, do nothing
             end
-            return nil, err
         end
+        local fkFields = self.ed.fnFKs
+        for fnFK, edName in pairs(fkFields) do
+            local fkId = self.values[fnFK]
+            local fkEd = gleecy.db.ed[edName]
+            if fkId and fkId:sub(1, fkEd.prefix:len()) ~= fkEd.prefix then
+                local fKey = fkEd.prefix..":"..fkId
+                self.values[fnFK] = fKey
+            end
+        end
+    end,
+    --- Check if keys (foreign or primary) is changed
+    --- Return 0 if no keys changed
+    --- Return 1 if one of FKs changed
+    --- Return 2 if PK changed and not any FK changed
+    --- Return 3 if at least 1 PK AND 1 FK changed
+    isKeyChanged = function(self, oldVals)
+        local keyChanged = 0
+        local fkFields = self.ed.fnFKs
+        for k, _ in pairs(fkFields) do
+            if oldVals[k] ~= nil then  -- fk changed
+                keyChanged = 1
+                break
+            end
+        end
+
+        local idFields = self.ed.fnIds
+        for i = #idFields, 1, -1 do
+            if oldVals[idFields[i]] ~= nil then -- PK changed
+                keyChanged = (keyChanged + 2)
+                break
+            end
+        end
+        return keyChanged
+    end,
+    getChildrenIds = function(self, entityName, conn)
+        local cEd = gleecy.db.ed[entityName]
+        local relKey = self:relKey(cEd)
+        return conn:sgetall(relKey)
+    end,
+    getChildren = function(self, entityName, conn)
+        local childrenIds = self:getChildrenIds(entityName, conn)
+        local children = utils.newTable(#childrenIds, 0)
+        for i = 1, #childrenIds, 1 do
+            children[i] = cEd:new({key = childrenIds[i]})
+            children[i].load(conn)
+        end
+        return children
+    end,
+    --- Load all fields from DB and overwrite existing fields of object
+    --- Return a hash table containing all fields of this objects that is different to DB version
+    load = function(self, conn)
+        local dbVals = conn:hgetall(self.values["key"]) or {}
+        local _, hlen = utils.tbllen(dbVals)
+        if hlen == 0 then
+            return nil -- self is new, not found in DB
+        end
+
+        local memVals = self.values -- Keep the differences between memory vs vs DB version
+        self.values = dbVals
+        for k, v in pairs(memVals) do
+            -- Remove all fields that have no differences
+            if not self.values[k] or self.values[k] == v then
+                memVals[k] = nil
+            end
+        end
+        self:resetFKeys(memVals)
+        return memVals
+    end,
+    relKey = function(self, ed)
+        return ed.prefix..":"..self.values["key"]
+    end,
+    addChild = function(self, childEntity, conn, nocommit)
+        local relKey = self:relKey(childEntity.ed)
+        local num = conn:sadd(relKey, childEntity.values.key)
         if not nocommit then
             conn:commit()
         end
+        return num
+    end,
+    removeChild = function(self, childEntity, conn, nocommit)
+        local relKey = self:relKey(childEntity.ed)
+        local num = conn:sremove(relKey, childEntity.values.key)
+        if not nocommit then
+            conn:commit()
+        end
+        return num
+    end,
+    removeOldParents = function(self, oldVals, conn)
+        local parents = self.ed:getFKEntities(oldVals)
+        if not parents or #parents == 0 then
+            return 0
+        end
+        local prevParents = utils.newTable(#parents - 1, 0)
+        for i = 1, #parents, 1 do
+            local parent = parents[i]
+            num = parent:removeChild(self, conn, true)
+            if num == 0 then
+                return nil, "Cannot remove foreign key "..parent.values.key
+            end
+            for j = 1, i - 1, 1 do
+                local prevParent = prevParents[j]
+                parent:removeChild(prevParent, conn, true)
+                prevParent:removeChild(parent, conn, true)
+            end
+            prevParents[i] = parent
+        end
+        return #parents
+    end,
+    updateParents = function(self, oldVals, conn)
+        local curFks = self.values
+        if self.values.version > 1 then -- UPDATE
+            local numFkChanges, err = self:removeOldParents(oldVals, conn, true)
+            if not numFkChanges then
+                return nil, err
+            end
+            if numFkChanges == 0 then
+                return 0
+            end
+            curFks = utils.newTable(0, numFkChanges)
+            local fnFks = self.ed.fnFKs
+            for i = 1, #fnFks, 1 do
+                if oldVals[fnFks[i]] ~= nil then
+                    curFks[fnFks[i]] = self.values[fnFks[i]]
+                end
+            end
+        end
+
+        local parents = self.ed:getFKEntities(curFks)
+        if not parents or #parents == 0 then
+            return 0
+        end
+        local prevParents = utils.newTable(#parents - 1, 0)
+        for i = 1, #parents, 1 do
+            local ok, err = parents[i]:addChild(self, conn, true)
+            if not ok then
+                return nil, "Cannot add foreign key '"..parents[i].values.key.."': "..(err or " Unknown error")
+            end
+            for j = 1, i - 1, 1 do
+                local prevParent = prevParents[j]
+                parents[i]:addChild(prevParent, conn, true)
+                prevParent:addChild(parents[i], conn, true)
+            end
+            prevParents[i] = parents[i]
+        end
+        return #parents
+    end,
+    _fail = function(conn, errMsg, nocommit)
+        if not nocommit then
+            conn:rollback()
+        end
+        return nil, errMsg
+    end,
+    save = function(self, conn, nocommit)
+        local oldVals, err = conn:hset(self.values["key"], self.values)
+        if not oldVals then return nil, "Failed to save: "..err end
+        local num
+        num, err = conn:sadd(self.ed.prefix, self.values["key"])
+        if not num or num == 0 then
+            num = nil
+            err = "INSERT failed on entity's key '"..self.values["key"].."' "..(err or ": Already exist")
+        else
+            num, err = self:updateParents(oldVals, conn)
+        end
+        if not num then
+            return self._fail(conn, err, nocommit)
+        end
+
+        if not nocommit then
+            conn:commit()
+        end
+        self:_notify(oldVals)
         return oldVals
     end,
     delete = function(self, conn, nocommit)
-        return self:deleteFields(conn, nocommit)
+        local fields = utils.keys(self.values)
+        if #fields == 0 then
+            return nil, "Cannot delete: input hash table is empty"
+        end
+        return self:deleteFields(conn, fields, nocommit)
     end,
     deleteFields = function(self, conn, fields, nocommit)
-        local oldVals, err = conn:hdel(self.key, fields)
+        local oldVals, err, curVals = conn:hdel(self.values["key"], fields)
         if not oldVals then return nil, err end
-        local sKey = "del:"..self.prefix
-        local num = conn:sadd(sKey, self.key)
-        if num == 0 then
-            num = conn:sismember(sKey, self.key)
+        for k, _ in pairs(oldVals) do
+            self.values[k] = nil
         end
-        if num == 0 then
-            err = "Cannot add tracking key "..sKey
-        else
-            _, err = conn:hset("del:"..self.key, oldVals) -- keep track of oldVals
+        for k, v in pairs(curVals) do
+            self.values[k] = v
         end
-        if err then
-            if not nocommit then
-                conn:rollback()
-            end
-            return nil, err
+        if oldVals.key then
+            conn:sremove(self.ed.prefix, oldVals.key)
         end
+        self:resetFKeys(oldVals)
+        self:resetKey(oldVals)
+        self:removeOldParents(oldVals, conn)
         if not nocommit then
             conn:commit()
         end
+        self:_notify(oldVals)
         return oldVals
     end
 }
 local _ED = {}
 _ED.__index = {
-    new = function(self, entityData)
-        local idFields = self.fnIds
-        if not idFields or #idFields == 0 then
-            return nil, "Definition for entity "..entityName.." is invalid: No ID fields defined"
+    _attach = utils.observable.__index._attach,
+    _detach = utils.observable.__index._detach,
+    generateKey = function(self, id)
+        local idType = type(id)
+        if idType == "string" then
+            return id
         end
+        if idType == "table" then
+            local key = self.prefix..":"
+            local sep = ""
+            local idFields = self.fnIds
+            if #id > 0 then -- is array:
+                if #id < #idFields then
+                    return nil, "Number of given IDs is less than number of required IDs"
+                end
+                for i = 1, #idFields, 1 do
+                    if not id[i] then
+                        return nil, "ID field "..idFields[i].." is missing"
+                    end
 
-        local key = self.prefix
-        for i = 1, #idFields do
-            local eId = entityData[idFields[i]]
-            if not eId then
-                return nil, "ID field "..idFields[i].." is missing"
+                    key = key..sep..id[i]:gsub(":", "--")
+                    sep = " "
+                end
+                return key
             end
-            key = key..":"..eId
-        end
 
-        local persistAction = 0 -- no action
-        if utils.popKey(entityData, "delete") then
-            persistAction = 1 -- DELETE
+            for i = 1, #idFields do
+                local eId = id[idFields[i]]
+                if not eId then
+                    -- support another way to pass primary IDs:
+                    eId = utils.popKey(id, "_id_"..i)
+                end
+                if not eId then
+                    return nil, "ID field "..idFields[i].." is missing"
+                end
+                key = key..sep..eId:gsub(":", "--")
+                sep = " "
+            end
+            return key
         end
-        return setmetatable( {schema = self, prefix = self.prefix, key = key,
-                              values = entityData, persistAction = persistAction}, _EV)
-    end
+        return nil, "Unknown ID type"
+    end,
+    new = function(self, entityData, noReset)
+        local ev = utils.newTable(0, 4)
+        ev.ed = self
+        if utils.isArray(entityData) then
+            ngx.log(ngx.INFO, "EntityData = "..table.concat(entityData, ","))
+            ev.values = utils.newTable(0, #entityData)
+            local fnIds = self.fnIds
+            local len = #fnIds
+            if len > #entityData then
+                return nil, "Entity Definition "..entityName.." requires "..tostring(len).." IDs"
+            end
+            for i = 1, len, 1 do
+                ev.values[fnIds[i]] = entityData[i]
+            end
+        else
+            ev.values = entityData
+        end
+        setmetatable(ev, _EV)
+        if not noReset then
+            -- Process foreign keys:
+            ev:resetFKeys()
+            -- Process primary key:
+            ev:resetKey()
+        end
+        return ev
+    end,
+    get = function(self, key, conn)
+        key = self:generateKey(key)
+        local eData = conn:hgetall(key)
+        eData["key"] = key
+        return self:new(eData, true)
+    end,
+    getAll = function(self, conn)
+        local ids = conn:sgetall(self.prefix)
+        if not ids or #ids == 0 then
+            return {}
+        end
+        local entities = utils.newTable(#ids, 0)
+        for i = 1, #ids, 1 do
+            entities[i] = self:get(ids[i], conn)
+        end
+        return entities
+    end,
+    getFKEntities = function(self, entityData)
+        if not entityData or utils.isTableEmpty(entityData) then
+            return {}
+        end
+        local fkFields = self.fnFKs
+        local _, numFks = utils.tbllen(fkFields)
+        local fKEntities = utils.newTable(numFks, 0)
+        local i = 1
+        for fnFK, enFK in pairs(fkFields) do
+            if entityData[fnFK] ~= nil then
+                fKEntities[i] = gleecy.db.ed[enFK]:new({key = entityData[fnFK] })
+                i = i + 1
+            end
+        end
+        return fKEntities
+    end,
 }
 gleecy.db.ed = {
+    _EnumType = setmetatable({
+        ename = "_EnumType",
+        prefix = "_e",
+        fnIds = {"enumTypeId"}, --ID field names
+        fnFKs = {} -- Foreign key field names
+    }, _ED),
+    _Enum = setmetatable({
+        ename = "_Enum",
+        prefix = "_e",
+        fnIds = {"enumId"}, --ID field names
+        fnFKs = {enumTypeId = "_EnumType"} -- Foreign key field names
+    }, _ED),
     ProductCategory = setmetatable({
-        prefix = "c",
+        ename = "ProductCategory",
+        prefix = "pc",
         fnIds = {"productCategoryId"}, --ID field names
-        fnFKs = {productCategoryTypeEnumId = "enum:ct"} -- Foreign key field names
+        fnFKs = {productCategoryTypeEnumId = "_Enum"} -- Foreign key field names
     }, _ED),
     Product = setmetatable({
+        ename = "Product",
         prefix = "p",
         fnIds = { "productId" },
         fnFKs = {}
     }, _ED),
     ProductCategoryRollup = setmetatable({
-        prefix = "c2c",
+        ename = "ProductCategoryRollup",
+        prefix = "pcr",
         fnIds = {"productCategoryId", "parentProductCategoryId"},
-        fnFKs = {productCategoryId = "c", parentProductCategoryId = "c"}
+        fnFKs = {productCategoryId = "ProductCategory", parentProductCategoryId = "ProductCategory"}
     }, _ED),
     ProductCategoryMember = setmetatable({
-        prefix = "c2p",
+        ename = "ProductCategoryMember",
+        prefix = "pcm",
         fnIds = {"productCategoryId", "productId", "fromDate"},
-        fnFKs = {productCategoryId = "c", productId = "p"}
+        fnFKs = {productCategoryId = "ProductCategory", productId = "Product"}
     }, _ED),
     ProductStorePromotion = setmetatable({
-        prefix = "promo",
+        ename = "ProductStorePromotion",
+        prefix = "psm",
         fnIds = {"storePromotionId"},
-        nFKs = {}
+        fnFKs = {}
     }, _ED),
 }
-
---function saveEntity(entity, conn)
---    local entityName = utils.popKey(entity, "entityName")
---    if not entityName then
---        return nil, "Entity Name is expected with key 'entityName'"
---    end
---    local entityDef = gleecy.db.ed[entityName]
---    if not entityDef then
---        return nil, "Entity '" .. entityName .."' has no definition"
---    end
---    local ok, err = conn:connect()
---    if not ok then
---        return nil, "failed to connect to DB: "..err
---    end
---    ok, err = entityDef:save(entity, conn)
---    conn:disconnect()
---    return ok, err
---end
---
---local _mtFK = {}
---_mtFK.__index = {
---    save = function(self, conn, toKey)
---        local ok, err = conn:srem(self.frRelKey, self.toKey)
---        if not ok then return nil, err end
---        return conn:sadd(self.frRelKey, toKey)
---    end
---}
---gleecy.db.ed.relation = {
---    fk = function(frKey, toKey, toPrefix)
---        return setmetatable({
---            frKey = frKey,
---            toKey = toKey,
---            toPrefix = toPrefix,
---            frRelKey = frKey..":"..toPrefix
---        }, _mtFK)
---    end
---}
 
 return gleecy.db.ed

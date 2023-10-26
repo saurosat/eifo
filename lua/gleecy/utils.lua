@@ -16,6 +16,40 @@ do
     ok, newTable = pcall(require, "table.new")
     if not ok then newTable = function() return {} end end
 end
+
+local attach = function(self, observer)
+    if not observer._observerId or observer._update then
+        return nil, [[observer object must have:
+            1.) a string property named '_observerId'
+            2.) a function named '_update(self, entityValue, oldValHashmap)']]
+    end
+    if not self._observers then
+        self._observers = {}
+    end
+    self._observers[observer._observerId] = observer
+    return self
+end
+local detach = function(self, observerId)
+    if not observerId then
+        return nil, "observerId is required"
+    end
+    self._observers[observerId] = nil
+    return self
+end
+local notify = function(self, oldVals)
+    if self._observers and not utils.isTableEmpty(self._observers) then
+        for _, v in pairs(self._observers) do
+            v:_update(self, oldVals)
+        end
+    end
+
+    if self.ed and self.ed._observers and not utils.isTableEmpty(self.ed._observers) then
+        for _, v in pairs(self.ed._observers) do
+            v:_update(self, oldVals)
+        end
+    end
+end
+
 local _lifo = {}
 _lifo.__index = {
     pop = function(self)
@@ -52,6 +86,9 @@ local isHashTbl = function(tbl)
     return not tbl or type(tbl) == 'table' and #tbl == 0
 end
 local tbllen = function(tbl)
+    if not tbl then
+        return 0, 0
+    end
     local len = 0
     local k = next(tbl)
     while k ~= null do
@@ -60,6 +97,33 @@ local tbllen = function(tbl)
     end
     local arrlen = #tbl
     return arrlen, len - arrlen
+end
+local existIn = function(array, item, from, to)
+    local i = from or #array
+    if i < 0 then return 0 end
+    if not to then
+        if i <= 1 then
+            to = #array
+        else
+            to = 1
+        end
+    end
+    local step, inRange
+    if i < to then
+        step = 1
+        inRange = function(a, b) return a <= b end
+    else
+        step = -1
+        inRange = function(a, b) return a >= b end
+    end
+
+    local notFound = true
+    while (inRange(i, to) and notFound) do
+        notFound = (array[i] == item)
+        i = i + step
+    end
+    if notFound then return 0 end
+    return i
 end
 local keys = function(tbl)
     local _, hlen = gleecy.utils.tbllen(tbl)
@@ -71,15 +135,8 @@ local keys = function(tbl)
     end
     return keys
 end
-local printTable = function(tbl)
-    if not tbl then
-        ngx.say("Table is null")
-        return
-    end
-    for k,v in pairs(tbl) do
-        ngx.say (k..": "..v.."<br/>")
-    end
-end
+
+
 local responseError = function(httpStatus, errMessage)
     ngx.status = httpStatus
     ngx.say("{'message':'"..errMessage.."'}")
@@ -113,31 +170,132 @@ local listToHash = function(list)
     end
     return hashmap
 end
-local bubbleRemove = function(list, i)
+
+local removeItem = function(list, item)
     local n = #list
-    if not list or not i or i <= 0 or i > n then
-        return 0
+    local found = {}
+    local i = 1
+    for j = 1, n, 1 do
+        if list[j] == item then
+            -- pop and not increase i :
+            found[#found + 1] = list[j]
+            list[j] = nil
+        elseif list[j] == nil then
+            -- continue next loop without increasing i
+        else
+            if j > i then
+                list[i] = list[j]
+                list[j] = null
+            end
+            i = i + 1
+        end
     end
-    for k = i, n - 1 do
-        list[k] = list[k+1]
+    return found
+end
+local splitStr = function(str, separator)
+    local tokens = {}
+    local sepRegex = "([^"..separator.."]+)"
+    for token in str:gmatch(sepRegex) do
+        tokens[#tokens + 1] = token
     end
-    list[n] = nil
+    return tokens
 end
 
-gleecy.utils = newTable(0, 13)
+local getPathParam = function(uri, api)
+    local paramStr = uri
+    if api then
+        local _, e = uri:find(api)
+        local i = uri:find('?')
+        if not i then
+            i = uri:find(' ')
+        end
+        if not i then
+            i = uri:len() + 1
+        end
+        paramStr = uri:sub(e+1, i-1)
+    end
+    return splitStr(paramStr, "/")
+end
+local function sourceCode(f)
+    local t = debug.getinfo(f)
+    return t.source
+    --if t.linedefined < 0 then return t.source end
+    --local i = 0
+    --local text = {}
+    --local name = t.source:gsub("^@","")
+    --if not name then
+    --    return t.source
+    --end
+    --for line in io.lines(name) do
+    --    i=i+1
+    --    if i >= t.linedefined then text[#text+1] = line end
+    --    if i >= t.lastlinedefined then break end
+    --end
+    --return table.concat(text,"\n")
+end
+local function toString(v, kvSep, newLine)
+    if v == nil then return "nil" end
+    if not v then return "false" end
+    local vType = type(v)
+    if vType == "table" then
+        kvSep = kvSep or ":"
+        newLine = newLine or "<br>"
+        local str = "{"
+        if #v > 0 then
+            str = str..toString(v[1], kvSep, newLine)
+            for i = 2, #v, 1 do
+                str = str..", "..toString(v[i], kvSep, newLine)
+            end
+        else
+            for key, val in pairs(v) do
+                str = str..newLine..key..kvSep..toString(val, kvSep, newLine)
+            end
+        end
+        str = str.."}"
+        return str
+    end
+    return (vType == "string" and v)
+            or (vType == "number" and _G.tostring(v))
+            or (vType == "boolean" and "true")
+            or (vType == "function" and sourceCode(v))
+            or vType
+end
+gleecy.utils = newTable(0, 20)
+gleecy.utils.sourceCode = sourceCode
+gleecy.utils.splitStr = splitStr
+gleecy.utils.getPathParam = getPathParam
 gleecy.utils.newTable = newTable
 gleecy.utils.isArray = isArray
+gleecy.utils.existIn = existIn
 gleecy.utils.isHashTbl = isHashTbl
 gleecy.utils.isTableEmpty = isTableEmpty
 gleecy.utils.keys = keys
 gleecy.utils.popKey = popKey
-gleecy.utils.bubbleRemove = bubbleRemove
+gleecy.utils.removeItem = removeItem
 gleecy.utils.mergeRef = mergeRef
 gleecy.utils.listToHash = listToHash
 gleecy.utils.tbllen = tbllen
-gleecy.utils.printTable = printTable
+gleecy.utils.toString = toString
+gleecy.utils.printTable = function(tbl)
+    if not tbl then
+        ngx.say("Table is null")
+        return
+    end
+    for k,v in pairs(tbl) do
+        ngx.say (k..": "..gleecy.utils.toString(v).."<br/>")
+    end
+end
 
 gleecy.utils.lifo = lifo
 
 gleecy.utils.responseError = responseError
+
+
+gleecy.utils.observable = {}
+gleecy.utils.observable.__index = {
+    _attach = attach,
+    _detach = detach,
+    _notify = notify
+}
+
 return gleecy.utils

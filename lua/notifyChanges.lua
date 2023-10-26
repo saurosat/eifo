@@ -3,8 +3,8 @@
 --- Created by tnguyen.
 --- DateTime: 9/2/23 12:06 PM
 ---
-local utils = require "utils"
-
+local utils = require "gleecy.utils"
+local lockKey = "notifyChanges"
     -- 1. Read Request data:
 local readReqData = require "resty.reqargs"
 local getData, postData, fileData = readReqData()
@@ -20,30 +20,42 @@ if not entityName then
     utils.responseError(ngx.HTTP_BAD_REQUEST, "Entity Name is expected with key 'entityName'")
     return
 end
+ngx.say("Entity Name: "..entityName)
 
-local ed = require("dao")[entityName]
+local ed = require("gleecy.dao")[entityName]
 if not ed then
     utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Entity '" .. entityName .."' has no definition")
     return
 end
+--ngx.say("Entity prefix: "..ed.prefix)
+--utils.printTable(reqData)
 local ev, err = ed:new(reqData)
 if not ev then
     utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Cannot initiate entity value: "..err)
     return
 end
-local connFactory = require("dbconn")
+local connFactory = require("gleecy.dbconn")
 local conn = connFactory.redis()
-local ok, err = conn:connect()
+local num = conn:decr(lockKey)
+local ok, error = conn:connect()
 if ok then
-    ok, err = ev:save(conn)
-end
-if not ok then
-    utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, err)
-else
-    ngx.status = ngx.HTTP_OK
-    ngx.say("OK!")
+    conn:incr(lockKey)
+    if utils.popKey(reqData, "delete") then
+        ok, error = ev:delete(conn)
+    else
+        ok, error = ev:save(conn)
+    end
 end
 conn:disconnect()
+if not ok then
+    utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, error)
+else
+    ngx.say("OK!")
+    ngx.status = ngx.HTTP_OK
+end
+--if num == 0 and ngx.var.autoRegen then
+--    ngx.location.capture("/generateStaticResource")
+--end
 
 --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_001&productName=Demo%20One&description=For%Demo1
 --- HASH type: "p:DEMO_001" --> {"productName": "Demo One", "description":"For%Demo1"}
@@ -53,7 +65,6 @@ conn:disconnect()
 --- HASH type: "p:DEMO_002" --> {"productName": "Demo Two", "description":"For%Demo2"}
 --- LIST type: "new:p" --> {DEMO_002, DEMO_001}
 
-ngx.eof()
 
     --- TEST DATA ---
     --- curl http://localhost:8090/notifyChanges?entityName=ProductStorePromotion&id=PopcBuyGet&storePromotionId=PopcBuyGet&productStoreId=POPC_DEFAULT&itemDescription=Buy%201%20Get%201%20Half%20Off&serviceRegisterId=BuyGetDiscount&sequenceNum=10&requireCode=Y&useLimitPerOrder=2&useLimitPerCustomer=4&useLimitPerPromotion=10
@@ -71,4 +82,8 @@ ngx.eof()
     --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_006&productId=DEMO_006&productName=Demo%20Six&description=For%Demo6&imageLocation=%2Fimg%2FDEMO_006.webp
     --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_007&productId=DEMO_007&productName=Demo%20Seven&description=For%Demo7&imageLocation=%2Fimg%2FDEMO_007.webp
     --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_008&productId=DEMO_008&productName=Demo%20Eight&description=For%Demo8&imageLocation=%2Fimg%2FDEMO_008.webp
+
+
+--- curl http://localhost:8090/notifyChanges?entityName=ProductCategoryMember&productCategoryId=PopcHome&productId=DEMO_001&fromDate=20231019
+--- curl http://localhost:8090/notifyChanges?entityName=ProductCategoryMember&productCategoryId=PopcHome&productId=DEMO_002&fromDate=20231019
     -- ngx.sleep(30)

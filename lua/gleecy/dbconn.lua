@@ -13,17 +13,16 @@ end
 if gleecy.db.conn then
     return gleecy.db.conn
 end
-local utils = require "utils"
+local utils = require "gleecy.utils"
 
-local RW = {}
-RW.__index = utils.newTable(0, 14)
-RW.__index.connect = function(self)
+local rwmt = utils.newTable(0, 18)
+rwmt.connect = function(self)
     return self.connection:connect(self._host, self._port)
 end
-RW.__index.disconnect = function(self)
+rwmt.disconnect = function(self)
     return self.connection:set_keepalive(self._timeout, self._poolsize)
 end
-RW.__index.rollback = function(self)
+rwmt.rollback = function(self)
     local _rollback = self._rollback
     --  execute undo functions in _rollback
     while _rollback:len() > 0 do
@@ -31,14 +30,24 @@ RW.__index.rollback = function(self)
         pcall(undo.f, table.unpack(undo.params))
     end
 end
-RW.__index.commit = function(self)
+rwmt.commit = function(self)
     -- reset rollback stack:
     self._rollback:reset()
 end
-RW.__index.lget = function(self, key, startPos, endPos)
+rwmt.incr = function(self, lockKey)
+    return self.connection:incr(lockKey)
+end
+rwmt.decr = function(self, lockKey)
+    return self.connection:decr(lockKey)
+end
+rwmt.getdel = function(self, lockKey)
+    return self.connection:getdel(lockKey)
+end
+
+rwmt.lget = function(self, key, startPos, endPos)
     return self.connection:lrange(key, startPos, endPos)
 end
-RW.__index.hget = function(self, key, fields)
+rwmt.hget = function(self, key, fields)
     if not fields or #fields == 0 then
         return self:hgetall(key)
     end
@@ -58,71 +67,122 @@ RW.__index.hget = function(self, key, fields)
     end
     return retTbl
 end
-RW.__index.hgetall = function(self, key)
+rwmt.hgetall = function(self, key)
     return utils.listToHash(self.connection:hgetall(key))
 end
-RW.__index.lgetall = function(self, key)
+rwmt.lgetall = function(self, key)
     return self:lget(key, 0, -1)
 end
-RW.__index.sgetall = function(self, key)
+rwmt.sgetall = function(self, key)
     return self.connection:smembers(key)
 end
-RW.__index.getall = function(self, key)
-    local v
-    local vType = self.connection:type(key)
-    if vType == "string" then
-        v = self.connection:get(key)
-    elseif vType == "list" then
-        v = self:lgetall(key)
-    elseif vType == "set" then
-        v = self:sgetall(key)
-    elseif vType == "hash" then
-        v = self:hgetall(key)
-    else
-        return nil, vType, "Type " .. vType .. " is not supported"
-    end
-    return v, vType
-end
-RW.__index.hset = function(self, key, hashValue, autocommit)
+rwmt.hset = function(self, key, hashValue, autocommit)
+    ngx.say("hset Input: <br>")
+    ngx.say(utils.toString(hashValue))
     local fields = utils.keys(hashValue)
-    local newVals = utils.newTable(0, #fields) -- malloc for a table with size = #fields
-    local oldVals = self:hget(key, fields) or {}
-
-    for i = #fields, 1, -1 do
-        local k = fields[i]
-        local v = hashValue[k]
-        if not oldVals[k] or oldVals[k] ~= v then
-            -- different:
-            newVals[k] = v
-        else
-            -- if equal
-            oldVals[k] = nil -- remove from oldVals
-            table.remove(fields, i) -- remove from fields
+    if #fields == 0 then
+        return nil, "Cannot save: input hash table is empty"
+    end
+    fields[#fields + 1] = "version"
+    local newVals
+    local oldVals = self:hget(key, fields)
+    ngx.say("OldVals: <br>")
+    utils.printTable(oldVals)
+    local newFields = {} -- keeps fields that is currently empty
+    if not oldVals or utils.isTableEmpty(oldVals) then
+        hashValue["version"] = 1
+        newVals = hashValue
+    else
+        hashValue["version"] = oldVals["version"] + 1
+        newVals = utils.newTable(0, #fields) -- malloc for a table with size = #fields
+        for i = #fields, 1, -1 do
+            local k = fields[i]
+            local v = hashValue[k]
+            if not oldVals[k] then
+                newFields[#newFields] = k
+                newVals[k] = v
+            elseif oldVals[k] ~= v then -- different:
+                newVals[k] = v
+            else -- if equal :
+                oldVals[k] = nil -- remove from oldVals
+                table.remove(fields, i) -- remove from fields
+            end
         end
     end
 
     if #fields == 0 then
         return {} -- no differences found. Ignored update
     end
+    ngx.say("hmset params: ")
+    utils.printTable(newVals)
     local ok, err = self.connection:hmset(key, newVals)
     if not ok then
         return nil, err
     end
     if not autocommit then
-        self._rollback:push({f = RW.__index.hdel, params = {self, key, fields, true}})
+        if not oldVals or utils.isTableEmpty(oldVals) then
+            self._rollback:push({f = rwmt.hdel, params = {self, key, fields, true}})
+        else
+            self._rollback:push({f = rwmt.hset, params = {self, key, oldVals, true}})
+            self._rollback:push({f = rwmt.hdel, params = {self, key, newFields, true}})
+        end
     end
     return oldVals
 end
-RW.__index.hdel = function(self, key, fields, autocommit)
-    local curvals = self:hget(key, fields)
+rwmt.hdel = function(self, key, fields, autocommit)
+    local curvals = self:hgetall(key)
     if not curvals or utils.isTableEmpty(curvals) then
-        return {}
+        return nil, "Cannot delete, key not found: "..key
+    end
+    local oldVals
+    local deleteAll
+    if not fields then
+        oldVals = curvals
+        deleteAll = true
+    else
+        if #fields == 0 then
+            return {}, nil --not delete any field
+        end
+        oldVals = utils.newTable(0, #fields)
+        for i = 1, #fields, 1 do
+            oldVals[fields[i]] = curvals[fields[i]]
+            curvals[fields[i]] = nil
+        end
+        local version = curvals["version"]
+        if version ~= nil then
+            local _, numRemainedFields = utils.tbllen(curvals)
+            if numRemainedFields <= 2 then
+                -- all fields is subjected to delete, should delete field 'version' as well:
+                deleteAll = true
+                fields[#fields] = "version" -- add 'version' to field list
+                oldVals["version"] = version
+                curvals["version"] = nil
+                oldVals["key"] = curvals["key"]
+                curvals["key"] = nil
+            else
+                deleteAll = false
+                oldVals["version"] = version
+                version = version + 1
+                curvals["version"] = version
+            end
+        else
+            -- 'version' not exist in curvals, mean that it's been moved to oldVals
+            -- ==> given fields contain 'version'
+            deleteAll = true
+            for k, v in pairs(curvals) do -- prepare to delete all
+                -- move all remaining to oldVals
+                oldVals[k] = v
+                curvals[k] = nil
+                fields[#fields] = k -- copy field to delete
+            end
+        end
     end
     local num
-    if fields then
-        num = self.connection:hdel(key, table.unpack(fields))
-    else
+    if deleteAll then
         num = self.connection:del(key)
+    else
+        num = self.connection:hset(key, "version", version + 1)
+        num = self.connection:hdel(key, table.unpack(fields))
     end
     if num == 0 then
         err = "Can not delete key '"..key.."'"
@@ -130,42 +190,65 @@ RW.__index.hdel = function(self, key, fields, autocommit)
         return nil, err
     end
     if not autocommit then
-        self._rollback:push({f = RW.__index.hset, params = {self, key, curvals, true}})
+        self._rollback:push({f = rwmt.hset, params = {self, key, oldVals, true}})
     end
-    return curvals
+    return oldVals, nil, curvals
 end
-RW.__index.sadd = function(self, key, item, autocommit)
-    local num = self.connection:sadd(key, item)
-    if not autocommit and num > 0 then
-        self._rollback:push({f = RW.__index.sremove, params = {self, key, item, true}})
+rwmt.sadd = function(self, key, item, autocommit)
+    local num, error = self.connection:sadd(key, item)
+    if not num then
+        ngx.log(ngx.ERR, "SADD Key="..(key or "NIL")..", item="..(item or "NIL")..error)
+        return 0, error
     end
-    return num
-end
-RW.__index.sremove = function(self, key, item, autocommit)
-    local num = self.connection:srem(key, item)
-    if not autocommit and num > 0 then
-        self._rollback:push({f = RW.__index.sadd, params = {self, key, item, true}})
+    if not autocommit and  num > 0 then
+        self._rollback:push({f = rwmt.sremove, params = {self, key, item, true}})
     end
     return num
 end
-RW.__index.sismember = function(self, key, item)
+rwmt.sremove = function(self, key, item, autocommit)
+    local num, err = self.connection:srem(key, item)
+    if not num then
+        ngx.log(ngx.ERR, error)
+        return 0, err
+    end
+    if not autocommit and num > 0 then
+        self._rollback:push({f = rwmt.sadd, params = {self, key, item, true}})
+    end
+    return num
+end
+rwmt.sismember = function(self, key, item)
     return self.connection:sismember(key, item)
 end
+setmetatable(rwmt, {__index = function(self, cmdName)  
+    local cmd = function(self, ...)
+        return self.connection[cmdName](self, ...)
+    end
+    rwmt[cmdName] = cmd
+    return cmd
+end})
+local RW = {
+    __index = rwmt
+}
 
 local redisAgent = require "resty.redis"
+
 gleecy.db.conn = {
     redis = function()
         local ngx = ngx
+        local timeout = ngx.var.timeout
         local connection = redisAgent:new()
         connection:set_timeouts(timeout)
-        return setmetatable({
+        local dbconn = {
             _host = ngx.var.dbhost,
             _port = ngx.var.dbport,
             _poolsize = ngx.var.poolsize,
-            _timeout = ngx.var.timeout,
+            _timeout = timeout,
             _rollback = utils.lifo(),
             connection = connection
-        }, RW)
+        }
+        setmetatable(dbconn, RW)
+        return dbconn
     end
 }
+
 return gleecy.db.conn

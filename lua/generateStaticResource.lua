@@ -17,7 +17,7 @@ if not ok then
     responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "failed to connect to Redis: " + errConn)
     return
 end
-local catIds = redis:smembers("new:c")
+local catIds = redis:smembers("pc")
 local catFVs = redis:hgetall(catIds[1])
 ngx.say("<!--"..": "..table.concat(catFVs,", ").."-->")
 local cat = {}
@@ -29,7 +29,7 @@ if(not catIds or #catIds == 0) then
 else
     ngx.say("<!--"..table.concat(catIds,", ").."-->")
 end
-local productIds = redis:smembers("new:p")
+local productIds = redis:smembers("p")
 ngx.say("<!--"..table.concat(productIds,", ").."-->")
 local products = {}
 for i = 1, #productIds do
@@ -54,6 +54,8 @@ local promotions = {{imgLocation="/img/promo1.jpeg", description="Buy one get on
 -- Generate index.html:
 local template = require "resty.template".new({location="/"})
 local func = template.compile("index.template.html", "no-cache")
+local utils = require("gleecy.utils")
+ngx.log(ngx.NOTICE, utils.toString(func))
 local html = func({category = cat, items = products, promotions = promotions})
 ngx.say(html)
 local basePath = ngx.var.basePath
