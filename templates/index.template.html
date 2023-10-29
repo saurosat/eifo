@@ -1,9 +1,26 @@
 {% layout = "base.template.html" %}
 
 {-main-}
-    {(promotions1.carousel.template.html, {promotions = promotions})}
     <!-- Promotion Carousel -->
+    {(promotions1.carousel.template.html, {promotions = promotions})}
+
+    <!-- newly added products: -->
     <section class="bg-white py-8">
-        {(productsByCategory.grid.template.html, {category = category, items = items})}
+        {("/category/productsByCategory.html")}
+    </section>
+
+    <!-- hot deals products: -->
+    <section class="bg-white py-8">
+        <!-- Products in HotDeals Category -->
+    </section>
+
+    <!-- hot deals products: -->
+    <section class="bg-white py-8">
+        <!-- Products in HotDeals Category -->
+    </section>
+
+    <!-- trending products: -->
+    <section class="bg-white py-8">
+        <!-- Products in HotDeals Category -->
     </section>
 {-main-}

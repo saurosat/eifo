@@ -299,7 +299,7 @@ _ED.__index = {
             local fnIds = self.fnIds
             local len = #fnIds
             if len > #entityData then
-                return nil, "Entity Definition "..entityName.." requires "..tostring(len).." IDs"
+                return nil, "Entity Definition "..self.ename.." requires "..tostring(len).." IDs"
             end
             for i = 1, len, 1 do
                 ev.values[fnIds[i]] = entityData[i]

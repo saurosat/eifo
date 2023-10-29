@@ -77,8 +77,7 @@ rwmt.sgetall = function(self, key)
     return self.connection:smembers(key)
 end
 rwmt.hset = function(self, key, hashValue, autocommit)
-    ngx.say("hset Input: <br>")
-    ngx.say(utils.toString(hashValue))
+    ngx.log(ngx.DEBUG, "hset Input: \n"..utils.toString(hashValue, ": ", "\n"))
     local fields = utils.keys(hashValue)
     if #fields == 0 then
         return nil, "Cannot save: input hash table is empty"
@@ -86,14 +85,13 @@ rwmt.hset = function(self, key, hashValue, autocommit)
     fields[#fields + 1] = "version"
     local newVals
     local oldVals = self:hget(key, fields)
-    ngx.say("OldVals: <br>")
-    utils.printTable(oldVals)
+    ngx.log(ngx.DEBUG, "OldVals: \n"..utils.toString(oldVals, ": ", "\n"))
     local newFields = {} -- keeps fields that is currently empty
     if not oldVals or utils.isTableEmpty(oldVals) then
         hashValue["version"] = 1
         newVals = hashValue
     else
-        hashValue["version"] = oldVals["version"] + 1
+        hashValue["version"] = (oldVals["version"] or 1) + 1
         newVals = utils.newTable(0, #fields) -- malloc for a table with size = #fields
         for i = #fields, 1, -1 do
             local k = fields[i]
@@ -113,8 +111,7 @@ rwmt.hset = function(self, key, hashValue, autocommit)
     if #fields == 0 then
         return {} -- no differences found. Ignored update
     end
-    ngx.say("hmset params: ")
-    utils.printTable(newVals)
+    ngx.log(ngx.DEBUG, "hmset params: "..utils.toString(newVals, ": ", "\n"))
     local ok, err = self.connection:hmset(key, newVals)
     if not ok then
         return nil, err

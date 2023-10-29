@@ -50,7 +50,8 @@ gleecy.controller.process = function(self, params)
         return
     end
     local outFile = "index"
-    if params and #params > 0 then
+    local model = self.model and require("gleecy.model").new(self.model)
+    if params and #params > 0 and params[1]:sub(1, 5) ~= "index" then
         if self.children[params[1]] then
             local name = table.remove(params, 1)
             local subDir = self.location.."/"..name
@@ -61,9 +62,9 @@ gleecy.controller.process = function(self, params)
             return self.children[name]:process(params)
         end
 
-        if self.model then
-            local ok, err = self.model:setParams(params)
-            if not ok and self.minParams > 0 then
+        if model then
+            local ok, err = model:setParams(params)
+            if not ok then
                 utils.responseError(HTTP_BAD_REQUEST, "Cann't find definition for : "..table.concat(params)..(err or ""))
                 return
             end
@@ -75,10 +76,10 @@ gleecy.controller.process = function(self, params)
     conn:connect()
     --local wp = workPermit.get(outPathFile, conn)
     local wp = {}
-    if wp ~= nil and self.model then
-        self.model:load(conn)
-        ngx.log(ngx.NOTICE, "self.model.entities = {\n"..utils.toString(self.model.entities, ":", "\r\n").."\n}\n")
-        for k, v in pairs(self.model.entities) do
+    if wp ~= nil and model then
+        model:load(conn)
+        ngx.log(ngx.NOTICE, "model.entities = {\n"..utils.toString(model.entities, ":", "\r\n").."\n}\n")
+        for k, v in pairs(model.entities) do
             ngx.log(ngx.NOTICE, utils.toString(v, ":", "\r\n"))
         end
     end
@@ -89,7 +90,7 @@ gleecy.controller.process = function(self, params)
         local fn = template.compile(self.view, "no-cache")
         ngx.log(ngx.NOTICE, utils.toString(fn))
         --ngx.log(ngx.NOTICE, utils.toString(v.compile, ":", "\n"))
-        local html = fn({model = self.model})
+        local html = fn({model = model})
         ngx.log(ngx.NOTICE, "\r\n\r\n End rendering: \r\n")
         local f = assert(io.open(outPathFile, "w"))
         f:write(html)

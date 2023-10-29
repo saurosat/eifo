@@ -9,7 +9,7 @@ local lockKey = "notifyChanges"
 local readReqData = require "resty.reqargs"
 local getData, postData, fileData = readReqData()
 local reqData = utils.mergeRef(getData, postData)
-if not reqData then
+if not reqData or utils.isTableEmpty(reqData) then
     utils.responseError(ngx.HTTP_NO_CONTENT, "Request data is missing"..err1)
     return
 end
@@ -67,23 +67,23 @@ end
 
 
     --- TEST DATA ---
-    --- curl http://localhost:8090/notifyChanges?entityName=ProductStorePromotion&id=PopcBuyGet&storePromotionId=PopcBuyGet&productStoreId=POPC_DEFAULT&itemDescription=Buy%201%20Get%201%20Half%20Off&serviceRegisterId=BuyGetDiscount&sequenceNum=10&requireCode=Y&useLimitPerOrder=2&useLimitPerCustomer=4&useLimitPerPromotion=10
-    --- curl http://localhost:8090/notifyChanges?entityName=ProductStorePromotion&id=PopcNewCustomer&storePromotionId=PopcNewCustomer&itemDescription=20%25%20Discount%20for%20New%20Customers
-    --- curl http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcHome&productCategoryId=PopcHome&categoryName=Home%20Page&productCategoryTypeEnumId=PctCatalog
-    --- curl http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcBrowseRoot&productCategoryId=PopcBrowseRoot&categoryName=Browse%20Root&productCategoryTypeEnumId=PctCatalog
-    --- curl http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcAllProducts&productCategoryId=PopcAllProducts&categoryName=All&Products&productCategoryTypeEnumId=PctCatalog
-    --- curl http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcDeals&productCategoryId=PopcDeals&categoryName=Deals&productCategoryTypeEnumId=PctCatalog
-    --- curl http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcNew&productCategoryId=PopcNew&categoryName=New%20Products&productCategoryTypeEnumId=PctCatalog
-    --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_001&productId=DEMO_001&productName=Demo%20One&description=For%Demo1&&imageLocation=%2Fimg%2FDEMO_001.webp
-    --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_002&productId=DEMO_002&productName=Demo%20Two&description=For%Demo2&imageLocation=%2Fimg%2FDEMO_002.webp
-    --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_003&productId=DEMO_003&productName=Demo%20Three&description=For%Demo3&imageLocation=%2Fimg%2FDEMO_003.webp
-    --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_004&productId=DEMO_004&productName=Demo%20Four&description=For%Demo4&imageLocation=%2Fimg%2FDEMO_004.webp
-    --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_005&productId=DEMO_005&productName=Demo%20Five&description=For%Demo5&imageLocation=%2Fimg%2FDEMO_005.webp
-    --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_006&productId=DEMO_006&productName=Demo%20Six&description=For%Demo6&imageLocation=%2Fimg%2FDEMO_006.webp
-    --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_007&productId=DEMO_007&productName=Demo%20Seven&description=For%Demo7&imageLocation=%2Fimg%2FDEMO_007.webp
-    --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_008&productId=DEMO_008&productName=Demo%20Eight&description=For%Demo8&imageLocation=%2Fimg%2FDEMO_008.webp
+    --- curl "http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcHome&productCategoryId=PopcHome&categoryName=Home%20Page&productCategoryTypeEnumId=PctCatalog"
+    --- curl "http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcBrowseRoot&productCategoryId=PopcBrowseRoot&categoryName=Browse%20Root&productCategoryTypeEnumId=PctCatalog"
+    --- curl "http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcAllProducts&productCategoryId=PopcAllProducts&categoryName=All&Products&productCategoryTypeEnumId=PctCatalog"
+    --- curl "http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcDeals&productCategoryId=PopcDeals&categoryName=Deals&productCategoryTypeEnumId=PctCatalog"
+    --- curl "http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcNew&productCategoryId=PopcNew&categoryName=New%20Products&productCategoryTypeEnumId=PctCatalog"
+    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_001&productId=DEMO_001&productName=Demo%20One&description=For%Demo1&&imageLocation=%2Fimg%2FDEMO_001.webp"
+    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_002&productId=DEMO_002&productName=Demo%20Two&description=For%Demo2&imageLocation=%2Fimg%2FDEMO_002.webp"
+    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_003&productId=DEMO_003&productName=Demo%20Three&description=For%Demo3&imageLocation=%2Fimg%2FDEMO_003.webp"
+    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_004&productId=DEMO_004&productName=Demo%20Four&description=For%Demo4&imageLocation=%2Fimg%2FDEMO_004.webp"
+    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_005&productId=DEMO_005&productName=Demo%20Five&description=For%Demo5&imageLocation=%2Fimg%2FDEMO_005.webp"
+    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_006&productId=DEMO_006&productName=Demo%20Six&description=For%Demo6&imageLocation=%2Fimg%2FDEMO_006.webp"
+    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_007&productId=DEMO_007&productName=Demo%20Seven&description=For%Demo7&imageLocation=%2Fimg%2FDEMO_007.webp"
+    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_008&productId=DEMO_008&productName=Demo%20Eight&description=For%Demo8&imageLocation=%2Fimg%2FDEMO_008.webp"
 
+--- curl "http://localhost:8090/notifyChanges?entityName=ProductStorePromotion&id=PopcBuyGet&storePromotionId=PopcBuyGet&productStoreId=POPC_DEFAULT&itemDescription=Buy%201%20Get%201%20Half%20Off&serviceRegisterId=BuyGetDiscount&sequenceNum=10&requireCode=Y&useLimitPerOrder=2&useLimitPerCustomer=4&useLimitPerPromotion=10"
+--- curl "http://localhost:8090/notifyChanges?entityName=ProductStorePromotion&id=PopcNewCustomer&storePromotionId=PopcNewCustomer&itemDescription=20%25%20Discount%20for%20New%20Customers"
 
---- curl http://localhost:8090/notifyChanges?entityName=ProductCategoryMember&productCategoryId=PopcHome&productId=DEMO_001&fromDate=20231019
---- curl http://localhost:8090/notifyChanges?entityName=ProductCategoryMember&productCategoryId=PopcHome&productId=DEMO_002&fromDate=20231019
+--- curl "http://localhost:8090/notifyChanges?entityName=ProductCategoryMember&productCategoryId=PopcHome&productId=DEMO_001&fromDate=20231019"
+--- curl "http://localhost:8090/notifyChanges?entityName=ProductCategoryMember&productCategoryId=PopcHome&productId=DEMO_002&fromDate=20231019"
     -- ngx.sleep(30)
