@@ -3,16 +3,16 @@
 --- Created by tnguyen.
 --- DateTime: 9/17/23 1:18 PM
 ---
-if not gleecy then
-    gleecy = {}
+if not eifo then
+    eifo = {}
 end
-if not gleecy.db then
-    gleecy.db = {}
+if not eifo.db then
+    eifo.db = {}
 end
-if gleecy.db.ed then
-    return gleecy.db.ed
+if eifo.db.ed then
+    return eifo.db.ed
 end
-local utils = require "gleecy.utils"
+local utils = require "eifo.utils"
 local ngx = ngx
 
 local _EV = {}
@@ -47,8 +47,8 @@ _EV.__index = {
         local fkFields = self.ed.fnFKs
         for fnFK, edName in pairs(fkFields) do
             local fkId = self.values[fnFK]
-            local fkEd = gleecy.db.ed[edName]
-            if fkId and fkId:sub(1, fkEd.prefix:len()) ~= fkEd.prefix then
+            local fkEd = eifo.db.ed[edName]
+            if fkId and string.sub(fkId, 1, fkEd.prefix:len()) ~= fkEd.prefix then
                 local fKey = fkEd.prefix..":"..fkId
                 self.values[fnFK] = fKey
             end
@@ -79,12 +79,12 @@ _EV.__index = {
         return keyChanged
     end,
     getChildrenIds = function(self, entityName, conn)
-        local cEd = gleecy.db.ed[entityName]
+        local cEd = eifo.db.ed[entityName]
         local relKey = self:relKey(cEd)
         return conn:sgetall(relKey)
     end,
-    getChildren = function(self, entityName, conn)
-        local childrenIds = self:getChildrenIds(entityName, conn)
+    getChildren = function(self, entityName, conn, childrenIds)
+        childrenIds = childrenIds or self:getChildrenIds(entityName, conn)
         local children = utils.newTable(#childrenIds, 0)
         for i = 1, #childrenIds, 1 do
             children[i] = cEd:new({key = childrenIds[i]})
@@ -199,16 +199,21 @@ _EV.__index = {
     save = function(self, conn, nocommit)
         local oldVals, err = conn:hset(self.values["key"], self.values)
         if not oldVals then return nil, "Failed to save: "..err end
-        local num
-        num, err = conn:sadd(self.ed.prefix, self.values["key"])
-        if not num or num == 0 then
-            num = nil
-            err = "INSERT failed on entity's key '"..self.values["key"].."' "..(err or ": Already exist")
+        if utils.isTableEmpty(oldVals) then
+            if self.values["version"] == 1 then --case insert
+                local num, err = conn:sadd(self.ed.prefix, self.values["key"])
+                if not num or num == 0 then
+                    num = nil
+                    err = "INSERT failed on entity's key '"..self.values["key"].."' "..(err or ": Already exist")
+                end
+            else --case ignore update
+                return {}
+            end
         else
-            num, err = self:updateParents(oldVals, conn)
-        end
-        if not num then
-            return self._fail(conn, err, nocommit)
+            local num, err = self:updateParents(oldVals, conn)
+            if not num then
+                return self._fail(conn, err, nocommit)
+            end
         end
 
         if not nocommit then
@@ -268,7 +273,7 @@ _ED.__index = {
                         return nil, "ID field "..idFields[i].." is missing"
                     end
 
-                    key = key..sep..id[i]:gsub(":", "--")
+                    key = key..sep..string.gsub(id[i], ":", "--")
                     sep = " "
                 end
                 return key
@@ -283,7 +288,7 @@ _ED.__index = {
                 if not eId then
                     return nil, "ID field "..idFields[i].." is missing"
                 end
-                key = key..sep..eId:gsub(":", "--")
+                key = key..sep..string.gsub(eId, ":", "--")
                 sep = " "
             end
             return key
@@ -343,14 +348,14 @@ _ED.__index = {
         local i = 1
         for fnFK, enFK in pairs(fkFields) do
             if entityData[fnFK] ~= nil then
-                fKEntities[i] = gleecy.db.ed[enFK]:new({key = entityData[fnFK] })
+                fKEntities[i] = eifo.db.ed[enFK]:new({key = entityData[fnFK] })
                 i = i + 1
             end
         end
         return fKEntities
     end,
 }
-gleecy.db.ed = {
+eifo.db.ed = {
     _EnumType = setmetatable({
         ename = "_EnumType",
         prefix = "_e",
@@ -367,13 +372,25 @@ gleecy.db.ed = {
         ename = "ProductCategory",
         prefix = "pc",
         fnIds = {"productCategoryId"}, --ID field names
-        fnFKs = {productCategoryTypeEnumId = "_Enum"} -- Foreign key field names
+        fnFKs = {} -- Foreign key field names
     }, _ED),
     Product = setmetatable({
         ename = "Product",
         prefix = "p",
         fnIds = { "productId" },
         fnFKs = {}
+    }, _ED),
+    ProductContent = setmetatable({
+        ename = "ProductContent",
+        prefix = "pcnt",
+        fnIds = {"productContentId"},
+        fnFKs = {productId = "Product"} --, productContentTypeEnumId="_Enum"}
+    }, _ED),
+    ProductAssoc = setmetatable({
+        ename = "ProductAssoc",
+        prefix = "pa",
+        fnIds = {"productId", "toProductId", "productAssocTypeEnumId", "fromDate"},
+        fnFKs = {productId = "Product", toProductId = "Product" } --, productAssocTypeEnumId = "_Enum"}
     }, _ED),
     ProductCategoryRollup = setmetatable({
         ename = "ProductCategoryRollup",
@@ -387,12 +404,18 @@ gleecy.db.ed = {
         fnIds = {"productCategoryId", "productId", "fromDate"},
         fnFKs = {productCategoryId = "ProductCategory", productId = "Product"}
     }, _ED),
+    ProductStore = setmetatable({
+        ename = "ProductStore",
+        prefix = "ps",
+        fnIds = {"productStoreId"},
+        fnFKs = {}
+    }, _ED),
     ProductStorePromotion = setmetatable({
         ename = "ProductStorePromotion",
         prefix = "psm",
         fnIds = {"storePromotionId"},
-        fnFKs = {}
+        fnFKs = {productStoreId = "ProductStore"}
     }, _ED),
 }
 
-return gleecy.db.ed
+return eifo.db.ed

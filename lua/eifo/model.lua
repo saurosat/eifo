@@ -3,16 +3,20 @@
 --- Created by tnguyen.
 --- DateTime: 10/13/23 5:13 AM
 ---
-if not gleecy then
-    gleecy = {}
+if not eifo then
+    eifo = {}
 end
-if gleecy.model then
-    return gleecy.model
+if eifo.model then
+    return eifo.model
 end
-local utils = require("gleecy.utils")
+local utils = require("eifo.utils")
 
-local eds = require("gleecy.dao")
+local eds = require("eifo.dao")
 local function addEntity(self, entityName, ...)
+    return self:addEntity1(entityName, false, ...)
+end
+
+local function addEntity1(self, entityName, preload, ...)
     if not entityName then
         ngx.log(ngx.ERR, "Entity name is not specified")
         return nil, "Entity name is not specified"
@@ -22,15 +26,29 @@ local function addEntity(self, entityName, ...)
         return nil, "Entity Definition "..entityName.." is not found"
     end
     self.entities[entityName] = {}
-    local childENames = {...}
-    for i = 1, #childENames, 1 do
-        local eName = childENames[i]
+    local eNames = { ...}
+    if not self.childENames[entityName] then
+        self.childENames[entityName] = utils.newTable(#eNames, 0)
+    end
+    local childENames = self.childENames[entityName]
+    if not self.childPreloads[entityName] then
+        self.childPreloads[entityName] = utils.newTable(#eNames, 0)
+    end
+    local childPreloads = self.childPreloads[entityName]
+    for i = 1, #eNames, 1 do
+        local eName = eNames[i]
         if eds[eName] then
-            self.childENames[#self.childENames + 1] = eName
+            local idx = 1
+            while idx <= #childENames and childENames[idx] ~= eName do
+                idx = idx + 1
+            end
+            childENames[idx] = eName
+            childPreloads[idx] = preload
         end
     end
     return self
 end
+
 local function setParams(self, params)
     if not params or #params == 0 then
         return nil, "No params found" -- FIXME: In this case, prepare to load all entities for index page
@@ -63,28 +81,39 @@ local function setParams(self, params)
         end
     end]]
 end
+local function loadChildEntities(self, conn, entity)
+    local eName = entity.ed.ename
+    for i = 1, #self.childENames[eName], 1 do
+        local childEName = self.childENames[i]
+        -- For each entity, add a field containing array of child entity or child entities'IDs or
+        local ids = entity:getChildrenIds(childEName, conn)
+        if ids and #ids > 0 then
+            entity[childEName] = ids
+            -- Preload child entities
+            if self.childPreloads[i] then
+                entity[childEName].entities =
+                    entity:getChildren(childEName, conn, ids)
+            end
+        end
+    end
+end
 local function load(self, conn)
     for eName, eValue in pairs(self.entities) do
+        -- if setParams were not invoked on this eName, eValue should be empty
+        -- and there is no condition to search -->. Load all entities
         if utils.isTableEmpty(eValue) then -- if not any ID set, load all
+            -- In this case, each item in model.entities stores an array of EV
             self.entities[eName] = eds[eName]:getAll(conn)
-            ngx.log(ngx.DEBUG)
+            -- For each entity, load all IDs of registered children entities:
             for i = 1, #self.entities[eName], 1 do
-                local entity = self.entities[eName][i]
-                for j = 1, #self.childENames, 1 do
-                    local childEName = self.childENames[j]
-                    entity[childEName] =  entity:getChildrenIds(childEName, conn)
-                end
+                self:loadChildEntities(conn,self.entities[eName][i])
             end
         else
+            --eValue is an EV having all ID fields set. This case, each item in model.entities
+            -- store only one instance of EV
             eValue:load(conn) -- TODO: fix this to support searching by other fields
-            for i = 1, #self.childENames, 1 do
-                local keys = eValue:getChildrenIds(self.childENames[i], conn)
-                eValue[self.childENames[i]] = utils.newTable(#keys, 0)
-                for j = 1, #keys, 1 do
-                    local tokens = utils.splitStr(keys[j], ":")
-                    eValue[self.childENames[i]][j] = tokens[#tokens]
-                end
-            end
+            eValue[1] = eValue -- for consistency with case 'if' above
+            self:loadChildEntities(conn, eValue)
         end
     end
     return self
@@ -93,6 +122,7 @@ local _mt = utils.newTable(0, 6)
 _mt.load = load
 _mt.setParams = setParams
 _mt.addEntity = addEntity
+_mt.addPreloadEntity = addPreloadEntity
 --_mt._attach = utils.observable._attach
 --_mt._detach = utils.observable._detach
 --_mt._notify = utils.observable._notify
@@ -100,13 +130,14 @@ _mt._update = function(self, ev, oldVals)
     self._notify(ev, oldVals)
 end
 setmetatable(_mt, utils.observable)
-gleecy.model = {
+eifo.model = {
     new = function(refModel)
         local model = {}
         model._observerId = "model_"..tostring(math.random())
         model.entities = {}
         model.childENames = {}
         if(refModel) then
+            model.preloadENames = refModel.preloadENames
             model.childENames = refModel.childENames
             for k, v in pairs(refModel.entities) do
                 model.entities[k] = {}
@@ -120,5 +151,5 @@ gleecy.model = {
         return model
     end
 }
-return gleecy.model
+return eifo.model
 

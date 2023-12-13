@@ -3,7 +3,7 @@
 --- Created by tnguyen.
 --- DateTime: 9/2/23 12:06 PM
 ---
-local utils = require "gleecy.utils"
+local utils = require "eifo.utils"
 local lockKey = "notifyChanges"
     -- 1. Read Request data:
 local readReqData = require "resty.reqargs"
@@ -13,7 +13,7 @@ if not reqData or utils.isTableEmpty(reqData) then
     utils.responseError(ngx.HTTP_NO_CONTENT, "Request data is missing"..err1)
     return
 end
---utils.printTable(reqData)
+ngx.log(ngx.DEBUG, utils.toString(reqData, ": ", "\n"))
 
 local entityName = utils.popKey(reqData, "entityName")
 if not entityName then
@@ -22,7 +22,7 @@ if not entityName then
 end
 ngx.say("Entity Name: "..entityName)
 
-local ed = require("gleecy.dao")[entityName]
+local ed = require("eifo.dao")[entityName]
 if not ed then
     utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Entity '" .. entityName .."' has no definition")
     return
@@ -34,9 +34,8 @@ if not ev then
     utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Cannot initiate entity value: "..err)
     return
 end
-local connFactory = require("gleecy.dbconn")
+local connFactory = require("eifo.dbconn")
 local conn = connFactory.redis()
-local num = conn:decr(lockKey)
 local ok, error = conn:connect()
 if ok then
     conn:incr(lockKey)
@@ -46,12 +45,13 @@ if ok then
         ok, error = ev:save(conn)
     end
 end
+local num = conn:decr(lockKey)
 conn:disconnect()
 if not ok then
     utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, error)
 else
     ngx.say("OK!")
-    ngx.status = ngx.HTTP_OK
+    --ngx.status = ngx.HTTP_OK
 end
 --if num == 0 and ngx.var.autoRegen then
 --    ngx.location.capture("/generateStaticResource")

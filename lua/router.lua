@@ -3,21 +3,25 @@
 --- Created by tnguyen.
 --- DateTime: 10/11/23 7:55 AM
 ---
-local utils = require("gleecy.utils")
+local utils = require("eifo.utils")
 if not home then
-    local controller = require("gleecy.controller")
-    local model = require("gleecy.model")
+    local view = require("eifo.view")
+    local model = require("eifo.model")
     -- name, viewTemplate, model, minParams, parent
-    home = controller.new(nil, "index.view.html", nil, model.new():addEntity("Product"), 0)
-
+    home = view.new(nil, "index.view.html", nil, model.new():addEntity("Product"), 0)
+    -- /eifo/products/
+    -- /eifo/products/Product.DEMO__001
     local prd = home:createSub("products", "products/index.view.html", nil, model.new():addEntity("Product"), 0)
-    prd:createSub("GridItem", "products/GridItem.view.html", nil, model.new():addEntity("Product"), 1)
-    prd:createSub("Detail", "products/Detail.view.html", nil, model.new():addEntity("Product"), 1)
+    prd:createSub("GridItem", "products/GridItem.view.html", nil, model.new():addEntity1("Product", true, "ProductContent"), 1)
+    prd:createSub("Detail", "products/Detail.view.html", nil, model.new():addEntity1("Product", true, "ProductContent"), 1)
+
+    prd:createSub("ProductDetail", "products/productDetails.view.html", nil, model.new():addEntity("Product"), 1)
 
     local cat = home:createSub("categories", "categories/index.view.html", nil,
             model.new():addEntity("ProductCategory"), 0)
     cat:createSub("ProductsGridSection", "categories/ProductsGridSection.view.html", nil,
             model.new():addEntity("ProductCategory", "Product"), 1)
+
 
     local promo = home:createSub("promotions", "promotions/index.view.html", nil, model.new():addEntity("ProductStorePromotion"), 0)
     promo:createSub("carousel", "promotions/carousel.view.html", nil, model.new():addEntity("ProductStorePromotion"), 0)

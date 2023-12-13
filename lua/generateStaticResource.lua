@@ -54,7 +54,7 @@ local promotions = {{imgLocation="/img/promo1.jpeg", description="Buy one get on
 -- Generate index.html:
 local template = require "resty.template".new({location="/"})
 local func = template.compile("index.template.html", "no-cache")
-local utils = require("gleecy.utils")
+local utils = require("eifo.utils")
 ngx.log(ngx.NOTICE, utils.toString(func))
 local html = func({category = cat, items = products, promotions = promotions})
 ngx.say(html)

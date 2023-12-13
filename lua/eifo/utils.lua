@@ -3,11 +3,11 @@
 --- Created by tnguyen.
 --- DateTime: 9/14/23 5:00 PM
 ---
-if not gleecy then
-    gleecy = {}
+if not eifo then
+    eifo = {}
 end
-if gleecy.utils then
-    return gleecy.utils
+if eifo.utils then
+    return eifo.utils
 end
 
 local newTable
@@ -69,7 +69,7 @@ _lifo.__index = {
     len = function(self) return #self.values   end
 }
 local lifo = function(initialValues)
-    if not gleecy.utils.isArray(initialValues) then
+    if not eifo.utils.isArray(initialValues) then
         return nil, "input table must be an array"
     end
 
@@ -126,8 +126,8 @@ local existIn = function(array, item, from, to)
     return i
 end
 local keys = function(tbl)
-    local _, hlen = gleecy.utils.tbllen(tbl)
-    local keys = gleecy.utils.newTable(0, hlen)
+    local _, hlen = eifo.utils.tbllen(tbl)
+    local keys = eifo.utils.newTable(0, hlen)
     local i=0
     for k,_ in pairs(tbl) do
         i=i+1
@@ -260,42 +260,42 @@ local function toString(v, kvSep, newLine)
             or (vType == "function" and sourceCode(v))
             or vType
 end
-gleecy.utils = newTable(0, 20)
-gleecy.utils.sourceCode = sourceCode
-gleecy.utils.splitStr = splitStr
-gleecy.utils.getPathParam = getPathParam
-gleecy.utils.newTable = newTable
-gleecy.utils.isArray = isArray
-gleecy.utils.existIn = existIn
-gleecy.utils.isHashTbl = isHashTbl
-gleecy.utils.isTableEmpty = isTableEmpty
-gleecy.utils.keys = keys
-gleecy.utils.popKey = popKey
-gleecy.utils.removeItem = removeItem
-gleecy.utils.mergeRef = mergeRef
-gleecy.utils.listToHash = listToHash
-gleecy.utils.tbllen = tbllen
-gleecy.utils.toString = toString
-gleecy.utils.printTable = function(tbl)
+eifo.utils = newTable(0, 20)
+eifo.utils.sourceCode = sourceCode
+eifo.utils.splitStr = splitStr
+eifo.utils.getPathParam = getPathParam
+eifo.utils.newTable = newTable
+eifo.utils.isArray = isArray
+eifo.utils.existIn = existIn
+eifo.utils.isHashTbl = isHashTbl
+eifo.utils.isTableEmpty = isTableEmpty
+eifo.utils.keys = keys
+eifo.utils.popKey = popKey
+eifo.utils.removeItem = removeItem
+eifo.utils.mergeRef = mergeRef
+eifo.utils.listToHash = listToHash
+eifo.utils.tbllen = tbllen
+eifo.utils.toString = toString
+eifo.utils.printTable = function(tbl)
     if not tbl then
         ngx.say("Table is null")
         return
     end
     for k,v in pairs(tbl) do
-        ngx.say (k..": "..gleecy.utils.toString(v).."<br/>")
+        ngx.say (k..": "..eifo.utils.toString(v).."<br/>")
     end
 end
 
-gleecy.utils.lifo = lifo
+eifo.utils.lifo = lifo
 
-gleecy.utils.responseError = responseError
+eifo.utils.responseError = responseError
 
 
-gleecy.utils.observable = {}
-gleecy.utils.observable.__index = {
+eifo.utils.observable = {}
+eifo.utils.observable.__index = {
     _attach = attach,
     _detach = detach,
     _notify = notify
 }
 
-return gleecy.utils
+return eifo.utils

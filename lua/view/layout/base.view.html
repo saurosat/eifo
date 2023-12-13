@@ -1,109 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>gleecy</title>
-    <meta name="description" content="Free open source Tailwind CSS Store template">
-    <meta name="keywords" content="tailwind,tailwindcss,tailwind css,css,starter template,free template,store template, shop layout, minimal, monochrome, minimalistic, theme, nordic">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Gleecy Shopping">
+    <meta name="keywords" content="clothes, cross border, VN, Vietnam, Viet Nam, US, America">
 
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Work+Sans:200,400&display=swap">
     <link rel="stylesheet" href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css"/>
-    <link href="/dist/output.css" rel="stylesheet">
+    <link rel="stylesheet" href="/dist/output.css" >
+    <link rel="stylesheet" href="/base.css" >
 
-    <link href="https://fonts.googleapis.com/css?family=Work+Sans:200,400&display=swap" rel="stylesheet">
-
-    <style>
-
-         .work-sans {
-            font-family: 'Work Sans', sans-serif;
-        }
-
-        #menu-toggle:checked + #menu {
-            display: block;
-        }
-
-        .hover\:grow {
-            transition: all 0.3s;
-            transform: scale(1);
-        }
-
-        .hover\:grow:hover {
-            transform: scale(1.02);
-        }
-
-        .carousel-open:checked + .carousel-item {
-            position: static;
-            opacity: 100;
-        }
-
-        .carousel-item {
-            -webkit-transition: opacity 0.6s ease-out;
-            transition: opacity 0.6s ease-out;
-        }
-
-        #carousel-1:checked ~ .control-1,
-        #carousel-2:checked ~ .control-2,
-        #carousel-3:checked ~ .control-3 {
-            display: block;
-        }
-        .carousel-indicators {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-            position: absolute;
-            bottom: 2%;
-            left: 0;
-            right: 0;
-            text-align: center;
-            z-index: 10;
-        }
-
-        #carousel-1:checked ~ .control-1 ~ .carousel-indicators li:nth-child(1) .carousel-bullet,
-        #carousel-2:checked ~ .control-2 ~ .carousel-indicators li:nth-child(2) .carousel-bullet,
-        #carousel-3:checked ~ .control-3 ~ .carousel-indicators li:nth-child(3) .carousel-bullet {
-            color: #000;
-            /*Set to match the Tailwind colour you want the active one to be */
-        }
-
-      /* Hide the scrollbar for this container */
-      .sm:overflow-x-auto::-webkit-scrollbar {
-          display: none;
-      }
-
-    </style>
-    <!-- scrollbar style for horizontal menu scroll -->
-    <style>
-      .hide-scroll-bar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      .hide-scroll-bar::-webkit-scrollbar {
-        display: none;
-      }
-    </style>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.3.0/knockout-min.js"></script>
+    <title>Gleecy</title>
 </head>
-
 <body>
-
 <!-- MAIN HEADER, FIRST ROW -- logo, search, nav menu, sub nav menu -->
 <section>
     <nav class="bg-gray-800">
         <!-- DESKTOP & MOBILE SECTION THAT NEED TO BE INCLUDE IN THE VERY FIRST ROW -->
         <!-- ############################################ -->
         <div class="mx-auto max-w-7xl px-2 sm:px-4">
-
             <div class="relative flex h-16 items-center justify-between">
                 <div class="flex items-center px-2 ">
                     <!-- logo section -->
                     <div class="flex-shrink-0">
-                        <!--  <img class="h-8 w-auto" src="https://tailwindui.com/img/logos/mark.svg?color=indigo&shade=500" alt="Your Company"> -->
                         <a href="#" class="block rounded-md px-3 py-2 text-base font-medium text-white hover:bg-gray-700 hover:text-orange">GLEECY</a>
                     </div>
                 </div>
-
                 <!-- search-section -->
                 <div class="flex flex-1 hidden lg:block md:block">
                     <div class="w-full max-w-md">
@@ -116,9 +41,7 @@
                             </div>
                             <input id="search" name="search" class="block w-full  rounded-md border-0 bg-gray-700 py-1.5 pl-12 pr-3 text-gray-300 placeholder:text-gray-400 focus:bg-white focus:text-gray-900 focus:ring-0 sm:text-sm sm:leading-6" placeholder="Search" type="search">
                         </div>
-
                     </div>
-
                 </div>
 
                 <!-- language, signin, orders, returns section -->
@@ -182,7 +105,7 @@
                             </div>
                             <!-- orders-menu -->
                             <div class="hidden lg:ml-6 lg:block">
-                                <button type="button" class="flex items-center gap-x-1 text-sm font-semibold leading-6 text-gray-300 hover:bg-gray-700 hover:text-white p-1 rounded-md text-white" aria-expanded="false" onmouseover="show('orders-menu')" onmouseout="hide('orders-menu')">
+                                <button type="button" class="flex items-center gap-x-1 text-sm font-semibold leading-6 text-gray-300 hover:bg-gray-700 hover:text-white p-1 rounded-md text-white" aria-expanded="false" onmouseover="show('orders-menu')" onmouseout="hide('orders-menu')" >
                                     Orders
                                     <svg class="h-5 w-5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                         <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
@@ -190,7 +113,7 @@
                                 </button>
                                 <div class="absolute z-10 mt-2 w-32 py-0 max-w-md overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-gray-900/5 hidden" id="orders-menu" onmouseover="show('orders-menu')" onmouseout="hide('orders-menu')" >
                                     <div class="relative rounded-lg p-4 hover:bg-gray-100 hover:rounded-none">
-                                        <a href="#" class="block text-sm font-semibold leading-6 text-gray-900">
+                                        <a href="#" class="block text-sm font-semibold leading-6 text-gray-900" onclick="toggle('CartPopupContainer')">
                                             Orders
                                             <span class="absolute inset-0"></span>
                                         </a>
@@ -308,10 +231,6 @@
                     </button>
 
                 </div>
-
-
-
-
             </div>
 
             <!-- Hamburger menu dropdown location -->
@@ -334,7 +253,7 @@
                     </button>
                 </div>
                 <div class="relative rounded-md p-4 hover:bg-gray-100 hover:rounded-none" onclick="toggleOrdersMobile()">
-                    <button type="button" class="flex items-center gap-x-1 text-sm font-semibold leading-6 text-black" aria-expanded="false" >
+                    <button type="button" class="flex items-center gap-x-1 text-sm font-semibold leading-6 text-black" aria-expanded="false">
                         Orders
                         <svg class="h-5 w-5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
@@ -392,7 +311,7 @@
             <!-- second dropdown w/ hammenu -->
             <div class="absolute z-10 mt-2 w-32 py-0 max-w-md overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-gray-900/5 right-32 top-48 hidden" id="orders-menu-dropdown-mobile" onmouseleave="toggle('orders-menu-dropdown-mobile')" >
                 <div class="relative rounded-lg p-4 hover:bg-gray-100 hover:rounded-none">
-                    <a href="#" class="block text-sm font-semibold leading-6 text-gray-900">
+                    <a href="#" class="block text-sm font-semibold leading-6 text-gray-900" onclick="toggle('CartPopupContainer')">
                         Orders
                         <span class="absolute inset-0"></span>
                     </a>
@@ -634,6 +553,172 @@
     </nav>
 </section>
 
+<div id="CartPopupContainer" class="hidden z-50 p-8 fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 ">
+
+    <!--
+    Place holder to keep DOM for Cart UI
+    This element is invisible and empty at the beginning.
+    When user click a menuitem, two possible cases:
+    1. if its model is empty: request BO to get model, attach model to template to produce
+    DOM element, then put DOM element to this element
+    2. Else: make it popup (position is absolute, pinned by top right corner, and display is block)
+    -->
+    <!-- <script type="text/html" id="username-template">
+        <h3 data-bind="text: userName"></h3>
+        <p>Credits: <span data-bind='text: fullName'></span></p>
+    </script>
+
+    var userInfo = LoginService.login(); -->
+    <!-- <div data-bind="template: {name: 'username-template', data: userInfo}"></div> -->
+
+
+    <div class="bg-white w-1/2 overflow-y-auto  rounded-2xl relative p-6">
+        <button id="closePopup" class="absolute top-4 right-4 p-2" onclick="toggle('CartPopupContainer')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-6 w-6 text-gray-700">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+        <div class="mx-auto max-w-4xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900">Shopping Cart</h1>
+
+            <form class="mt-12">
+                <h2 class="sr-only">Items in your shopping cart</h2>
+                <div id="itemSummary" class="mt-10 sm:ml-32 sm:pl-6 mx-auto max-w-4xl">
+                    <h2 class="text-xl font-bold mb-4">Product Items</h2>
+                    <div data-bind="foreach: productItemList" class="mb-4">
+                        <div class="flex items-center justify-between border-b border-gray-200 py-4">
+                            <div class="flex-shrink-0">
+                                <!-- Replace 'imageUrl' with the actual property from your ViewModel -->
+                                <img data-bind="attr: { src: imageUrl, alt: itemDescription }" class="h-24 w-24 rounded-lg object-cover object-center sm:h-32 sm:w-32">
+                            </div>
+
+                            <div class="relative ml-4 flex flex-1 flex-col justify-between sm:ml-6">
+                                <div class="flex justify-between sm:grid sm:grid-cols-2">
+                                    <div class="pr-6">
+                                        <h3 class="text-sm">
+                                            <!-- Replace 'itemDescription' with the actual property from your ViewModel -->
+                                            <a href="#" class="font-medium text-gray-700 hover:text-gray-800" data-bind="text: itemDescription"></a>
+                                        </h3>
+                                        <p class="mt-1 text-sm text-gray-500">test//</p>
+                                    </div>
+
+                                    <p class="text-right text-sm font-medium text-gray-900">
+                                        <!-- Replace 'unitAmount' with the actual property from your ViewModel -->
+                                        $<span data-bind="text: unitAmount.toFixed(2)"></span>
+                                    </p>
+                                </div>
+
+                                <div class="mt-4 flex items-center sm:absolute sm:left-1/2 sm:top-0 sm:mt-0 sm:block">
+                                    <label for="quantity-0" class="sr-only">Quantity, Nomad Tumbler</label>
+                                    <select id="quantity-0" name="quantity-0" class="block max-w-full rounded-md border border-gray-300 py-1.5 text-left text-base font-medium leading-5 text-gray-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm">
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                        <option value="6">6</option>
+                                        <option value="7">7</option>
+                                        <option value="8">8</option>
+                                    </select>
+
+                                    <button type="button" class="ml-4 text-sm font-medium text-indigo-600 hover:text-indigo-500 sm:ml-0 sm:mt-3">
+                                        <span>Remove</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <p class="mt-4 flex space-x-2 text-sm text-gray-700">
+                                <svg class="h-5 w-5 flex-shrink-0 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                                </svg>
+                                <span>In stock</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- Order summary -->
+                <div id="orderSummary" class="mt-10 sm:ml-32 sm:pl-6">
+                    <div class="rounded-lg bg-gray-50 px-4 py-6 sm:p-6 lg:p-8">
+                        <h2 class="sr-only">Order summary</h2>
+
+                        <div class="flow-root">
+                            <dl class="-my-4 divide-y divide-gray-200 text-sm">
+                                <!-- ko foreach: orderSummaryItems -->
+                                <div class="flex items-center justify-between py-4">
+                                    <dt class="text-gray-600" data-bind="text: label"></dt>
+                                    <dd class="font-medium text-gray-900" data-bind="text: value"></dd>
+                                    <!-- <dt class="text-gray-600">Subtotal</dt>
+                                    <dd class="font-medium text-gray-900">$99.00</dd>
+                                  </div>
+                                  <div class="flex items-center justify-between py-4">
+                                    <dt class="text-gray-600">Shipping</dt>
+                                    <dd class="font-medium text-gray-900">$5.00</dd>
+                                  </div>
+                                  <div class="flex items-center justify-between py-4">
+                                    <dt class="text-gray-600">Tax</dt>
+                                    <dd class="font-medium text-gray-900">$8.32</dd>
+                                  </div>
+                                  <div class="flex items-center justify-between py-4">
+                                    <dt class="text-base font-medium text-gray-900">Order total</dt>
+                                    <dd class="text-base font-medium text-gray-900">$112.32</dd> -->
+                                </div>
+                                <!-- /ko -->
+
+                            </dl>
+                        </div>
+                    </div>
+                    <div class="mt-10">
+                        <button type="submit" class="w-full rounded-md border border-transparent bg-indigo-600 px-4 py-3 text-base font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-50">Checkout</button>
+                    </div>
+
+                    <div class="mt-6 text-center text-sm text-gray-500">
+                        <p>
+                            or
+                            <a href="#" class="font-medium text-indigo-600 hover:text-indigo-500">
+                                Continue Shopping
+                                <span aria-hidden="true"> &rarr;</span>
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+    </div>
+</div>
+
+<!-- shopping cart get request -->
+<!-- <script>
+    function CartViewModel() {
+      var self = this;
+      self.cartItems = ko.observableArray([]);
+      self.fetchDataAndPopulateCart = async function () {
+        try {
+          const response = await fetch('http://gleecy.io:8080/rest/s1/pop/login');
+
+          if (response.ok) {
+            const data = await response.json();
+
+            // Update the cartItems array with the fetched data
+            self.cartItems(data);
+
+          } else {
+            console.error('Request failed with status:', response.status);
+          }
+        } catch (error) {
+          console.error('Error fetching data:', error);
+        }
+    };
+
+      self.fetchDataAndPopulateCart();
+    }
+
+    // Apply bindings at the end of the body
+    var cartViewModel = new CartViewModel();
+    ko.applyBindings(cartViewModel);
+</script> -->
 
 <!-- NAV2 MENU SECTION, SECOND ROW Mobile SubNav Bar (Apparel, Telemedicine, etc) -->
 <section>
@@ -892,148 +977,7 @@
         </div>
     </footer>
 </section>
-
+<script src="/token"></script>
+<script type="text/javascript" src="/base.js"></script>
 </body>
-
-<!-- JAVASCRIPT -->
-<script>
-
-    var timer; //for the show/hide timeout code
-    var currentlyOpenMenu = null;
-
-    const subLan = document.getElementById('language-menu-dropdown-mobile');
-    const subSignin = document.getElementById('sign-in-menu-dropdown-mobile');
-    const subOrders = document.getElementById('orders-menu-dropdown-mobile');
-    const subReturns = document.getElementById('returns-menu-dropdown-mobile');
-
-//hamburger button and dropdown menu code
-/////////////////////////////////////////
-
-    document.addEventListener('click', function (event) {
-        const hamburgMenu = document.getElementById('hamburg-menu');
-        const mobileMenu = document.getElementById('language-menu-mobile');
-        const hamburgSpan = document.getElementById('hamburg-span');
-        const mobileMenuSub1 = document.getElementById('language-menu-dropdown-mobile-span1');
-        const mobileMenuSub12 = document.getElementById('language-menu-dropdown-mobile-span2');
-        const mobileMenuSub13 = document.getElementById('language-menu-dropdown-mobile-span3');
-        const mobileMenuSub2 = document.getElementById('sign-in-menu-dropdown-mobile-span');
-        const mobileMenuSub3 = document.getElementById('orders-menu-dropdown-mobile-span');
-        const mobileMenuSub4 = document.getElementById('returns-menu-dropdown-mobile-span');
-
-        //closes the menu if anything but the menu and its submenus is clicked. any new submenus and ids need to be added here so a click on them wont trigger the whole thing dissapearing
-        if (!mobileMenu.contains(event.target) && event.target !== hamburgMenu && event.target !== hamburgSpan && event.target !== mobileMenuSub1 && event.target !== mobileMenuSub2 && event.target !== mobileMenuSub3 && event.target !== mobileMenuSub4 && event.target !== mobileMenuSub12 && event.target !== mobileMenuSub13) {
-            mobileMenu.classList.add('hidden');
-            subLan.classList.add('hidden');
-            subSignin.classList.add('hidden');
-            subOrders.classList.add('hidden');
-            subReturns.classList.add('hidden');
-
-
-        }
-        //close all other submenus when opening another submenu
-
-        if (!mobileMenu.contains(event.target) && event.target !== hamburgMenu && event.target !== hamburgSpan) {
-            mobileMenuSub1.classList.add('hidden');
-            mobileMenuSub2.classList.add('hidden');
-            mobileMenuSub3.classList.add('hidden');
-            mobileMenuSub4.classList.add('hidden');
-
-        }
-
-
-    });
-
-    function toggleMobileMenu() {
-        const mobileMenu = document.getElementById('language-menu-mobile');
-        mobileMenu.classList.toggle('hidden');
-        if(subLan.classList.contains('hidden')){subLan.classList.add('hidden');}
-        else{subLan.classList.toggle('hidden');}
-
-        if(subSignin.classList.contains('hidden')){subSignin.classList.add('hidden');}
-        else{subSignin.classList.toggle('hidden');}
-
-        if(subOrders.classList.contains('hidden')){subOrders.classList.add('hidden');}
-        else{subOrders.classList.toggle('hidden');}
-
-        if(subReturns.classList.contains('hidden')){subReturns.classList.add('hidden');}
-        else{subReturns.classList.toggle('hidden');}
-        // subSignin.classList.toggle('hidden');
-        // subOrders.classList.toggle('hidden');
-        // subReturns.classList.toggle('hidden');
-        mobileMenuVisible = !mobileMenuVisible;
-    }
-
-
-
-    function show(elementID) {//from   w w w . j  a  va2  s.  c o  m
-
-        var show_menu = document.getElementById(elementID);
-        if (currentlyOpenMenu != null)
-            document.getElementById(currentlyOpenMenu).style.display ="none"; //close the previous menu, if exists
-        currentlyOpenMenu = elementID;
-        show_menu.style.display="block";
-        clearTimeout(timer);
-
-
-    }
-
-    function hide(elementID) {
-        var hide_menu = document.getElementById(elementID);
-        timer = setTimeout(function() {
-            hide_menu.style.display = "none";
-        }, 70);
-    }
-
-    function toggle(elementID) {
-        var element = document.getElementById(elementID);
-        if (element.classList.contains("hidden")) {
-            element.classList.remove("hidden");
-        } else {
-            element.classList.add("hidden");
-        }
-    }
-
-    function close(elementID) {
-        var element = document.getElementById(elementID);
-        element.classList.add("hidden");
-    }
-
-    function toggleLangMobile(){
-        toggle('language-menu-dropdown-mobile');
-        close('sign-in-menu-dropdown-mobile');
-        close('orders-menu-dropdown-mobile');
-        close('returns-menu-dropdown-mobile');
-    }
-
-    function toggleSignInMobile(){
-        close('language-menu-dropdown-mobile');
-        toggle('sign-in-menu-dropdown-mobile');
-        close('orders-menu-dropdown-mobile');
-        close('returns-menu-dropdown-mobile');
-    }
-
-    function toggleOrdersMobile(){
-        close('language-menu-dropdown-mobile');
-        close('sign-in-menu-dropdown-mobile');
-        toggle('orders-menu-dropdown-mobile');
-        close('returns-menu-dropdown-mobile');
-    }
-
-    function toggleReturnsMobile(){
-        close('language-menu-dropdown-mobile');
-        close('sign-in-menu-dropdown-mobile');
-        close('orders-menu-dropdown-mobile');
-        toggle('returns-menu-dropdown-mobile');
-    }
-    function checkScreenSize() {
-        if (window.innerWidth >= 1024) { // Tailwind CSS breakpoints: md and lg
-            close('language-menu-mobile');
-        }
-    }
-
-
-    window.addEventListener('resize', checkScreenSize);
-
-</script>
-
 </html>

@@ -3,17 +3,17 @@
 --- Created by tnguyen.
 --- DateTime: 9/17/23 9:42 AM
 ---
-if not gleecy then
-    gleecy = {}
+if not eifo then
+    eifo = {}
 end
-if not gleecy.db then
-    gleecy.db = {}
+if not eifo.db then
+    eifo.db = {}
 end
 
-if gleecy.db.conn then
-    return gleecy.db.conn
+if eifo.db.conn then
+    return eifo.db.conn
 end
-local utils = require "gleecy.utils"
+local utils = require "eifo.utils"
 
 local rwmt = utils.newTable(0, 18)
 rwmt.connect = function(self)
@@ -83,15 +83,17 @@ rwmt.hset = function(self, key, hashValue, autocommit)
         return nil, "Cannot save: input hash table is empty"
     end
     fields[#fields + 1] = "version"
-    local newVals
     local oldVals = self:hget(key, fields)
+    fields[#fields] = nil
+    local newVals
+    local newVersion = 1
     ngx.log(ngx.DEBUG, "OldVals: \n"..utils.toString(oldVals, ": ", "\n"))
     local newFields = {} -- keeps fields that is currently empty
     if not oldVals or utils.isTableEmpty(oldVals) then
         hashValue["version"] = 1
         newVals = hashValue
     else
-        hashValue["version"] = (oldVals["version"] or 1) + 1
+        newVersion = (oldVals["version"] or 1) + 1 -- default 1 for backward compatibility
         newVals = utils.newTable(0, #fields) -- malloc for a table with size = #fields
         for i = #fields, 1, -1 do
             local k = fields[i]
@@ -105,6 +107,10 @@ rwmt.hset = function(self, key, hashValue, autocommit)
                 oldVals[k] = nil -- remove from oldVals
                 table.remove(fields, i) -- remove from fields
             end
+        end
+        if not utils.isTableEmpty(newVals) then
+            newVals["version"] = newVersion
+            hashValue["version"] = newVersion
         end
     end
 
@@ -229,7 +235,7 @@ local RW = {
 
 local redisAgent = require "resty.redis"
 
-gleecy.db.conn = {
+eifo.db.conn = {
     redis = function()
         local ngx = ngx
         local timeout = ngx.var.timeout
@@ -248,4 +254,4 @@ gleecy.db.conn = {
     end
 }
 
-return gleecy.db.conn
+return eifo.db.conn
