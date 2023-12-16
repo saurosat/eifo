@@ -6,25 +6,29 @@
 local utils = require("eifo.utils")
 if not home then
     local view = require("eifo.view")
-    local model = require("eifo.model")
+    local VModelBuilder = require("eifo.vmodel")
     -- name, viewTemplate, model, minParams, parent
-    home = view.new(nil, "index.view.html", nil, model.new():addEntity("Product"), 0)
+    local indexVModel = VModelBuilder.new("index", "_Index")
+    local productVModel = indexVModel:rightJoin("Product", "_idx", "products")
+    local contentVModel = productVModel:rightJoin("ProductContent", "productId", "productContents")
+
+    home = view.new(nil, "index.view.html", indexVModel, 0)
     -- /eifo/products/
     -- /eifo/products/Product.DEMO__001
-    local prd = home:createSub("products", "products/index.view.html", nil, model.new():addEntity("Product"), 0)
-    prd:createSub("GridItem", "products/GridItem.view.html", nil, model.new():addEntity1("Product", true, "ProductContent"), 1)
-    prd:createSub("Detail", "products/Detail.view.html", nil, model.new():addEntity1("Product", true, "ProductContent"), 1)
+--     local prd = home:createSub("products", "products/index.view.html", model.new():addEntity("Product"), 0)
+--     prd:createSub("GridItem", "products/GridItem.view.html", model.new():addEntity1("Product", true, "ProductContent"), 1)
+--     prd:createSub("Detail", "products/Detail.view.html", model.new():addEntity1("Product", true, "ProductContent"), 1)
 
-    prd:createSub("ProductDetail", "products/productDetails.view.html", nil, model.new():addEntity("Product"), 1)
+--     prd:createSub("ProductDetail", "products/productDetails.view.html", model.new():addEntity("Product"), 1)
 
-    local cat = home:createSub("categories", "categories/index.view.html", nil,
-            model.new():addEntity("ProductCategory"), 0)
-    cat:createSub("ProductsGridSection", "categories/ProductsGridSection.view.html", nil,
-            model.new():addEntity("ProductCategory", "Product"), 1)
+--     local cat = home:createSub("categories", "categories/index.view.html", 
+--             model.new():addEntity("ProductCategory"), 0)
+--     cat:createSub("ProductsGridSection", "categories/ProductsGridSection.view.html",]
+--             model.new():addEntity("ProductCategory", "Product"), 1)
 
 
-    local promo = home:createSub("promotions", "promotions/index.view.html", nil, model.new():addEntity("ProductStorePromotion"), 0)
-    promo:createSub("carousel", "promotions/carousel.view.html", nil, model.new():addEntity("ProductStorePromotion"), 0)
+--     local promo = home:createSub("promotions", "promotions/index.view.html", model.new():addEntity("ProductStorePromotion"), 0)
+--     promo:createSub("carousel", "promotions/carousel.view.html", model.new():addEntity("ProductStorePromotion"), 0)
     -- ....
 end
 ngx.log(ngx.INFO, "URI: ____"..ngx.var.request_uri.."_____")

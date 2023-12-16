@@ -4,7 +4,7 @@
 --- DateTime: 12/13/23 10:08 AM
 ---
 local VModelBuilder = require("eifo.vmodel")
-local productView = VModelBuilder.new("Product")
+local productView = VModelBuilder.new(nil, "Product")
 local pcmView = productView:rightJoin("ProductCategoryMember", "productId", "categories")
 productView:rightJoin("ProductContent", "productId", "productContents")
 local productModel = productView:newVModel()

@@ -4,13 +4,14 @@
 --- DateTime: 9/2/23 12:06 PM
 ---
 local utils = require "eifo.utils"
+local eds = require "eifo.dao"
 local lockKey = "notifyChanges"
     -- 1. Read Request data:
 local readReqData = require "resty.reqargs"
 local getData, postData, fileData = readReqData()
 local reqData = utils.mergeRef(getData, postData)
 if not reqData or utils.isTableEmpty(reqData) then
-    utils.responseError(ngx.HTTP_NO_CONTENT, "Request data is missing"..err1)
+    utils.responseError(ngx.HTTP_NO_CONTENT, "Request data is missing")
     return
 end
 ngx.log(ngx.DEBUG, utils.toString(reqData, ": ", "\n"))
@@ -22,7 +23,7 @@ if not entityName then
 end
 ngx.say("Entity Name: "..entityName)
 
-local ed = require("eifo.dao")[entityName]
+local ed = eds[entityName]
 if not ed then
     utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Entity '" .. entityName .."' has no definition")
     return

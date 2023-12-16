@@ -13,7 +13,7 @@ end
 if eifo.db.conn then
     return eifo.db.conn
 end
-local utils = require "eifo.utils"
+local utils = eifo.utils
 
 local rwmt = utils.newTable(0, 18)
 rwmt.connect = function(self)
@@ -77,7 +77,7 @@ rwmt.sgetall = function(self, key)
     return self.connection:smembers(key)
 end
 rwmt.hset = function(self, key, hashValue, autocommit)
-    ngx.log(ngx.DEBUG, "hset Input: \n"..utils.toString(hashValue, ": ", "\n"))
+    --ngx.log(ngx.DEBUG, "hset Input: \n"..utils.toString(hashValue, ": ", "\n"))
     local fields = utils.keys(hashValue)
     if #fields == 0 then
         return nil, "Cannot save: input hash table is empty"
@@ -87,7 +87,7 @@ rwmt.hset = function(self, key, hashValue, autocommit)
     fields[#fields] = nil
     local newVals
     local newVersion = 1
-    ngx.log(ngx.DEBUG, "OldVals: \n"..utils.toString(oldVals, ": ", "\n"))
+    --ngx.log(ngx.DEBUG, "OldVals: \n"..utils.toString(oldVals, ": ", "\n"))
     local newFields = {} -- keeps fields that is currently empty
     if not oldVals or utils.isTableEmpty(oldVals) then
         hashValue["version"] = 1
@@ -117,7 +117,7 @@ rwmt.hset = function(self, key, hashValue, autocommit)
     if #fields == 0 then
         return {} -- no differences found. Ignored update
     end
-    ngx.log(ngx.DEBUG, "hmset params: "..utils.toString(newVals, ": ", "\n"))
+    --ngx.log(ngx.DEBUG, "hmset params: "..utils.toString(newVals, ": ", "\n"))
     local ok, err = self.connection:hmset(key, newVals)
     if not ok then
         return nil, err
@@ -236,15 +236,22 @@ local RW = {
 local redisAgent = require "resty.redis"
 
 eifo.db.conn = {
-    redis = function()
+    host = "127.0.0.1",
+    port = "6379",
+    poolsize = 100,
+    timeout = 10000,
+    redis = function(host, port, poolsize, timeout)
         local ngx = ngx
-        local timeout = ngx.var.timeout
+        host = host or eifo.db.host or ngx.var.dbhost
+        port = port or eifo.db.port or ngx.var.dbport
+        poolsize = poolsize or eifo.db.poolsize or ngx.var.poolsize
+        timeout = timeout or eifo.db.timeout or ngx.var.timeout
         local connection = redisAgent:new()
         connection:set_timeouts(timeout)
         local dbconn = {
-            _host = ngx.var.dbhost,
-            _port = ngx.var.dbport,
-            _poolsize = ngx.var.poolsize,
+            _host = host,
+            _port = port,
+            _poolsize = poolsize,
             _timeout = timeout,
             _rollback = utils.lifo(),
             connection = connection

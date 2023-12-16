@@ -18,15 +18,15 @@ local data = {
     {   eName = "Product",
         cols = { "productId", "productName", "description", "imageLocation" },
         vals = {
-            { "DEMO_001", "Demo One", "For Demo1", "/img/DEMO_001.webp" },
-            { "DEMO_002", "Demo Two", "For Demo2", "/img/DEMO_002.webp" },
-            { "DEMO_003", "Demo Three", "For Demo3", "/img/DEMO_003.webp" },
-            { "DEMO_004", "Demo Four", "For Demo4", "/img/DEMO_004.webp" },
-            { "DEMO_005", "Demo Five", "For Demo5", "/img/DEMO_005.webp" },
-            { "DEMO_006", "Demo Six", "For Demo6", "/img/DEMO_006.webp" },
-            { "DEMO_007", "Demo Seven", "For Demo7", "/img/DEMO_007.webp" },
-            { "DEMO_008", "Demo Eight", "For Demo8", "/img/DEMO_008.webp" },
-            { "DEMO_009", "Demo Nine", "For Demo9", "/img/DEMO_008.webp" }
+            { "DEMO_001", "Demo One", "For Demo1", "/DEMO_001.webp" },
+            { "DEMO_002", "Demo Two", "For Demo2", "/DEMO_002.webp" },
+            { "DEMO_003", "Demo Three", "For Demo3", "/DEMO_003.webp" },
+            { "DEMO_004", "Demo Four", "For Demo4", "/DEMO_004.webp" },
+            { "DEMO_005", "Demo Five", "For Demo5", "/DEMO_005.webp" },
+            { "DEMO_006", "Demo Six", "For Demo6", "/DEMO_006.webp" },
+            { "DEMO_007", "Demo Seven", "For Demo7", "/DEMO_007.webp" },
+            { "DEMO_008", "Demo Eight", "For Demo8", "/DEMO_008.webp" },
+            { "DEMO_009", "Demo Nine", "For Demo9", "/DEMO_008.webp" }
         }
     },
     {   eName = "ProductStorePromotion",

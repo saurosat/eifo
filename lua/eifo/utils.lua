@@ -14,14 +14,19 @@ local newTable
 do
     local ok
     ok, newTable = pcall(require, "table.new")
-    if not ok then newTable = function() return {} end end
+    if not ok then newTable = function(...) return {} end end
 end
 
 local attach = function(self, observer)
-    if not observer._observerId or observer._update then
-        return nil, [[observer object must have:
-            1.) a string property named '_observerId'
-            2.) a function named '_update(self, entityValue, oldValHashmap)']]
+    if not observer._observerId then
+        local errMsg = [[Observer have no observerId]]
+        ngx.log(ngx.ERR, errMsg)
+        return nil, errMsg
+    end
+    if not observer._update then
+        local errMsg = [[Observer doesn't have a function named '_update(self, entityValue, oldValHashmap)']]
+        ngx.log(ngx.ERR, errMsg)
+        return nil, "Observer have no _update method"
     end
     if not self._observers then
         self._observers = {}
@@ -37,17 +42,18 @@ local detach = function(self, observerId)
     return self
 end
 local notify = function(self, oldVals)
-    if self._observers and not utils.isTableEmpty(self._observers) then
-        for _, v in pairs(self._observers) do
-            v:_update(self, oldVals)
-        end
-    end
+    ngx.log(ngx.DEBUG, "Sender: "..eifo.utils.toString(self, ": ", "\r\n"))
+    ngx.log(ngx.DEBUG, "oldVals: "..eifo.utils.toString(oldVals, ": ", "\r\n"))
 
-    if self.ed and self.ed._observers and not utils.isTableEmpty(self.ed._observers) then
-        for _, v in pairs(self.ed._observers) do
-            v:_update(self, oldVals)
-        end
+    if not self._observers or eifo.utils.isTableEmpty(self._observers) then
+        ngx.log(ngx.ALERT, "Notify without any receivers: "..eifo.utils.toString(self, ": ", "\r\n"))
+        return false, "No receivers"
     end
+    for _, v in pairs(self._observers) do
+        ngx.log(ngx.DEBUG, "Receiver: "..eifo.utils.toString(v, ": ", "\r\n"))
+        v:_update(self, oldVals)
+    end
+    return true
 end
 
 local _lifo = {}
@@ -91,7 +97,7 @@ local tbllen = function(tbl)
     end
     local len = 0
     local k = next(tbl)
-    while k ~= null do
+    while k ~= nil do
         k = next(tbl, k)
         len = len + 1
     end
@@ -185,7 +191,7 @@ local removeItem = function(list, item)
         else
             if j > i then
                 list[i] = list[j]
-                list[j] = null
+                list[j] = nil
             end
             i = i + 1
         end
@@ -233,28 +239,44 @@ local function sourceCode(f)
     --end
     --return table.concat(text,"\n")
 end
-local function toString(v, kvSep, newLine)
+local function toString(v, kvSep, newLine, refs)
     if v == nil then return "nil" end
     if not v then return "false" end
     local vType = type(v)
+    local strTab = "\r"
+    -- prevent circular invokes:
+    if not refs or #refs == 0 then
+        refs = {v}
+    else
+        local refsLen = #refs
+        for i = 1, refsLen, 1 do
+            strTab = strTab.."    "
+            if v == refs[i] then
+                return vType
+            end
+        end
+        refs[refsLen + 1] = v
+    end
+    local str
     if vType == "table" then
         kvSep = kvSep or ":"
         newLine = newLine or "<br>"
-        local str = "{"
+        str = strTab.."{"
         if #v > 0 then
-            str = str..toString(v[1], kvSep, newLine)
+            str = str..strTab.."    "..toString(v[1], kvSep, newLine, refs)
             for i = 2, #v, 1 do
-                str = str..", "..toString(v[i], kvSep, newLine)
+                str = str..", "..strTab.."    "..toString(v[i], kvSep, newLine, refs)
             end
         else
             for key, val in pairs(v) do
-                str = str..newLine..key..kvSep..toString(val, kvSep, newLine)
+                str = str..strTab.."    "..key..kvSep..toString(val, kvSep, newLine, refs)
             end
         end
-        str = str.."}"
-        return str
+        str = strTab..str.."}"
     end
-    return (vType == "string" and v)
+    refs[#refs] = nil
+    return  str
+            or (vType == "string" and v)
             or (vType == "number" and _G.tostring(v))
             or (vType == "boolean" and "true")
             or (vType == "function" and sourceCode(v))
@@ -291,8 +313,7 @@ eifo.utils.lifo = lifo
 eifo.utils.responseError = responseError
 
 
-eifo.utils.observable = {}
-eifo.utils.observable.__index = {
+eifo.utils.observable = {
     _attach = attach,
     _detach = detach,
     _notify = notify

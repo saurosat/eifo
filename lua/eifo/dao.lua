@@ -12,14 +12,15 @@ end
 if eifo.db.ed then
     return eifo.db.ed
 end
+local KEY_SEP = "+"
+local PREFIX_SEP = ":"
+
 local utils = require "eifo.utils"
 local ngx = ngx
 
 local _EV = {}
 _EV.__index = {
-    _attach = utils.observable.__index._attach,
-    _detach = utils.observable.__index._detach,
-    _notify = utils.observable.__index._notify,
+    _notify = utils.observable._notify,
     resetKey = function(self, oldVals)
         if oldVals then
             local keyChanged = self:isKeyChanged(oldVals)
@@ -32,7 +33,12 @@ _EV.__index = {
             return self.values["key"]
         end
 
-        self.values["key"] = self.ed:generateKey(self.values)
+        local key, err = self.ed:generateKey(self.values)
+        if not key then
+            ngx.log(ngx.ERR, "Can not generate key for entity: "..(err or "No additional info"))
+            return nil, err
+        end
+        self.values["key"] = key
         return self.values["key"]
     end,
 
@@ -49,7 +55,7 @@ _EV.__index = {
             local fkId = self.values[fnFK]
             local fkEd = eifo.db.ed[edName]
             if fkId and string.sub(fkId, 1, fkEd.prefix:len()) ~= fkEd.prefix then
-                local fKey = fkEd.prefix..":"..fkId
+                local fKey = fkEd.prefix..PREFIX_SEP..fkId
                 self.values[fnFK] = fKey
             end
         end
@@ -84,6 +90,7 @@ _EV.__index = {
         return conn:sgetall(relKey)
     end,
     getChildren = function(self, entityName, conn, childrenIds)
+        local cEd = eifo.db.ed[entityName]
         childrenIds = childrenIds or self:getChildrenIds(entityName, conn)
         local children = utils.newTable(#childrenIds, 0)
         for i = 1, #childrenIds, 1 do
@@ -113,7 +120,7 @@ _EV.__index = {
         return memVals
     end,
     relKey = function(self, ed)
-        return ed.prefix..":"..self.values["key"]
+        return ed.prefix..PREFIX_SEP..self.values["key"]
     end,
     addChild = function(self, childEntity, conn, nocommit)
         local relKey = self:relKey(childEntity.ed)
@@ -139,7 +146,7 @@ _EV.__index = {
         local prevParents = utils.newTable(#parents - 1, 0)
         for i = 1, #parents, 1 do
             local parent = parents[i]
-            num = parent:removeChild(self, conn, true)
+            local num = parent:removeChild(self, conn, true)
             if num == 0 then
                 return nil, "Cannot remove foreign key "..parent.values.key
             end
@@ -175,18 +182,11 @@ _EV.__index = {
         if not parents or #parents == 0 then
             return 0
         end
-        local prevParents = utils.newTable(#parents - 1, 0)
         for i = 1, #parents, 1 do
             local ok, err = parents[i]:addChild(self, conn, true)
             if not ok then
                 return nil, "Cannot add foreign key '"..parents[i].values.key.."': "..(err or " Unknown error")
             end
-            for j = 1, i - 1, 1 do
-                local prevParent = prevParents[j]
-                parents[i]:addChild(prevParent, conn, true)
-                prevParent:addChild(parents[i], conn, true)
-            end
-            prevParents[i] = parents[i]
         end
         return #parents
     end,
@@ -197,23 +197,16 @@ _EV.__index = {
         return nil, errMsg
     end,
     save = function(self, conn, nocommit)
+        ngx.log(ngx.DEBUG, "self.values['key'] = "..(self.values["key"] or "NIL")..". self.values.key = "..(self.values.key or "NIL"))
         local oldVals, err = conn:hset(self.values["key"], self.values)
         if not oldVals then return nil, "Failed to save: "..err end
-        if utils.isTableEmpty(oldVals) then
-            if self.values["version"] == 1 then --case insert
-                local num, err = conn:sadd(self.ed.prefix, self.values["key"])
-                if not num or num == 0 then
-                    num = nil
-                    err = "INSERT failed on entity's key '"..self.values["key"].."' "..(err or ": Already exist")
-                end
-            else --case ignore update
-                return {}
-            end
-        else
-            local num, err = self:updateParents(oldVals, conn)
-            if not num then
-                return self._fail(conn, err, nocommit)
-            end
+        if utils.isTableEmpty(oldVals) and (not self.values["version"] or self.values["version"] > 1) then --case ignore update
+            return {}
+        end
+        -- Index for FKs:
+        local num, err = self:updateParents(oldVals, conn)
+        if not num then
+            return self._fail(conn, err, nocommit)
         end
 
         if not nocommit then
@@ -253,16 +246,15 @@ _EV.__index = {
 }
 local _ED = {}
 _ED.__index = {
-    _attach = utils.observable.__index._attach,
-    _detach = utils.observable.__index._detach,
+    _attach = utils.observable._attach,
+    _detach = utils.observable._detach,
     generateKey = function(self, id)
         local idType = type(id)
         if idType == "string" then
             return id
         end
         if idType == "table" then
-            local key = self.prefix..":"
-            local sep = ""
+            local key, sep = self.prefix, PREFIX_SEP
             local idFields = self.fnIds
             if #id > 0 then -- is array:
                 if #id < #idFields then
@@ -273,12 +265,13 @@ _ED.__index = {
                         return nil, "ID field "..idFields[i].." is missing"
                     end
 
-                    key = key..sep..string.gsub(id[i], ":", "--")
-                    sep = " "
+                    key = key..sep..string.gsub(id[i], PREFIX_SEP, ".")
+                    sep = KEY_SEP
                 end
                 return key
             end
 
+            -- else: is hash table (an EV):
             for i = 1, #idFields do
                 local eId = id[idFields[i]]
                 if not eId then
@@ -288,15 +281,16 @@ _ED.__index = {
                 if not eId then
                     return nil, "ID field "..idFields[i].." is missing"
                 end
-                key = key..sep..string.gsub(eId, ":", "--")
-                sep = " "
-            end
+                key = key..sep..string.gsub(eId, PREFIX_SEP, ".")
+                sep = KEY_SEP
+        end
             return key
         end
         return nil, "Unknown ID type"
     end,
     new = function(self, entityData, noReset)
-        local ev = utils.newTable(0, 4)
+        local ev = utils.newTable(0, 5)
+        ev._observers = self._observers
         ev.ed = self
         if utils.isArray(entityData) then
             ngx.log(ngx.INFO, "EntityData = "..table.concat(entityData, ","))
@@ -312,18 +306,28 @@ _ED.__index = {
         else
             ev.values = entityData
         end
+        if self.fnFKs["_idx"] then
+            ev.values["_idx"] = "idx:index"
+        end
         setmetatable(ev, _EV)
         if not noReset then
             -- Process foreign keys:
             ev:resetFKeys()
             -- Process primary key:
-            ev:resetKey()
+            local key, err = ev:resetKey()
+            if not key then
+                return nil, err
+            end
+            ngx.log(ngx.DEBUG, "ev.values['key'] = "..(ev.values["key"] or "NIL")..". ev.values.key = "..(ev.values.key or "NIL"))
         end
         return ev
     end,
     get = function(self, key, conn)
         key = self:generateKey(key)
         local eData = conn:hgetall(key)
+        if not eData or utils.isTableEmpty(eData) then
+            return nil
+        end
         eData["key"] = key
         return self:new(eData, true)
     end,
@@ -356,6 +360,12 @@ _ED.__index = {
     end,
 }
 eifo.db.ed = {
+    _Index = setmetatable({
+        ename = "_Index",
+        prefix = "idx",
+        fnIds = { "id" },
+        fnFKs = {}
+    }, _ED),
     _EnumType = setmetatable({
         ename = "_EnumType",
         prefix = "_e",
@@ -372,13 +382,13 @@ eifo.db.ed = {
         ename = "ProductCategory",
         prefix = "pc",
         fnIds = {"productCategoryId"}, --ID field names
-        fnFKs = {} -- Foreign key field names
+        fnFKs = {_idx = "_Index"} -- Foreign key field names
     }, _ED),
     Product = setmetatable({
         ename = "Product",
         prefix = "p",
         fnIds = { "productId" },
-        fnFKs = {}
+        fnFKs = {_idx = "_Index"}
     }, _ED),
     ProductContent = setmetatable({
         ename = "ProductContent",
@@ -408,14 +418,13 @@ eifo.db.ed = {
         ename = "ProductStore",
         prefix = "ps",
         fnIds = {"productStoreId"},
-        fnFKs = {}
+        fnFKs = {_idx = "_Index"}
     }, _ED),
     ProductStorePromotion = setmetatable({
         ename = "ProductStorePromotion",
         prefix = "psm",
         fnIds = {"storePromotionId"},
-        fnFKs = {productStoreId = "ProductStore"}
+        fnFKs = {productStoreId = "ProductStore", _idx = "_Index"}
     }, _ED),
 }
-
 return eifo.db.ed

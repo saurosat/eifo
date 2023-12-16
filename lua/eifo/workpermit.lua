@@ -3,6 +3,7 @@
 --- Created by tnguyen.
 --- DateTime: 10/10/23 9:30 AM
 ---
+-- TODO: store workPermit in Shared Dict instead of Redis
 if not eifo then
     eifo = {}
 end

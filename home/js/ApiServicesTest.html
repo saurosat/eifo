@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="ApiServices.js"></script>
+    <script>
+    </script>
+</head>
+<body class="bg-white text-gray-600 work-sans leading-normal text-base tracking-normal">
+	<div id="main"></div>
+    <script>
+        var handleResponse = function(response) {
+            var htmlStr = "<ul>"
+            var geos = response.data.geoList;
+            try {
+                for (let i = 0; i < geos.length; i++) {
+                    htmlStr = htmlStr + "<li>" + geos[i]["geoName"] + "</li><br>"
+                }
+            } catch (error) {
+                alert("Error:" + error);
+            }
+            htmlStr = htmlStr + "</ul>"
+            document.getElementById("main").innerHTML = htmlStr;
+        }
+         GeoService.getCountries(handleResponse);
+    </script>
+</body>
+

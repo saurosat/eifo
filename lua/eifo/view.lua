@@ -6,34 +6,33 @@
 
 --module("eifo.view")
 
-if not eifo then
-    eifo = {}
-end
 if eifo.view then
     return eifo.view
 end
-local utils = require("eifo.utils")
-local basePath = ngx.var.basePath
+local utils = eifo.utils
 
-local eds = require("eifo.dao")
-local connFactory = require("eifo.dbconn")
+local eds = eifo.dao
 local workPermit = require("eifo.workpermit")
 local ngx = ngx
 
-local function visitor(content, tag, name)
-
-end
 eifo.view = utils.newTable(0,8)
-eifo.view._update = function(self, ev, oldVals)
-    local evId = ev.values["key"] or oldVals["key"]
-    evId = evId:sub(ev.ed.prefix:len() + 2, -1)
+eifo.view.getOutFile = function(self, key)
+    local prefix = self.modelBuilder.ed.prefix
+    local prefixLen = (prefix and prefix:len()) or 0
+    local nonPrefixKey = (not key and "index") or key:sub(prefixLen + 2, -1)
+    return self.location.."/".. nonPrefixKey ..".html", nonPrefixKey
+end
 
-    local outFile = self.location.."/".. evId ..".html"
-    os.remove(outFile)
-
-    local conn = self.connPool.redis()
+eifo.view._update = function(self, vModel, _)
+    local conn = eifo.db.conn.redis()
     conn:connect()
-    workPermit.create(outFile, evId, conn)
+    local numRecords = #vModel
+    for i = 1, numRecords, 1 do
+        local record = vModel[i]
+        local outFile, nonPrefixKey = self:getOutFile(record.key)
+        workPermit.create(outFile, nonPrefixKey, conn)
+        os.remove(outFile)
+    end
     conn:disconnect()
 end
 eifo.view.getUri = function(self, id)
@@ -61,15 +60,23 @@ eifo.view.process = function(self, params)
         end
         return self.children[name]:process(params)
     end
+    if numParams == 0 then
+        params[1] = "index" --> TODO: create a root ED and only one record with ID='index'
+        numParams = 1
+    end
 
-    local outFile = (numParams > 0 and params[1]) or "index"
-    local outPathFile = self.location.."/"..outFile..".html"
+    local modelBuilder = self.modelBuilder
+    local ed = modelBuilder.ed;
+    local key = ed:generateKey(params)
+    ngx.log(ngx.DEBUG, "Param key = "..key)
+    local outPathFile, outFile = self:getOutFile(key)
     --local wp = workPermit.get(outPathFile, conn) -- disable for testing. TODO: re-enable
     local wp = {} -- For testing purpose only (delete file manually)
     if wp ~= nil then
-        local model, err = self:getModel(params)
-        if err then
-            utils.responseError(HTTP_BAD_REQUEST, err..": "..table.concat(params))
+        local model, err = self:getModel(key)
+        if not model then
+            ngx.log(ngx.DEBUG, "Entity not found whil searching with params "..table.concat(params)..": "..(err or "(No error info)"))
+            utils.responseError(ngx.HTTP_NOT_FOUND, "Page not found ")
             return
         end
         local html = self:getHtml(model)
@@ -84,39 +91,41 @@ eifo.view.process = function(self, params)
     ngx.log(ngx.INFO, "redirecting to: /home"..self.outLocationUri.."/"..outFile..".html")
     ngx.exec("/home"..self.outLocationUri.."/"..outFile..".html")
 end
-eifo.view.getModel = function(self, params)
-    if not self.model then
+eifo.view.getModel = function(self, key)
+    if not self.modelBuilder then
         return nil, nil
     end
-    local model = require("eifo.model").new(self.model)
-    if params and #params > 0 then
-        local ok, err = model:setParams(params)
-        if not ok then
-            return ok, err
+    local vModel = self.modelBuilder:newVModel()
+
+    local conn = eifo.db.conn.redis()
+    conn:connect()
+    local vRecord, err = vModel:loadByKey(key, conn)
+    conn:disconnect()
+    if not vRecord then
+        err = err or "No records found. Please check maxLevel setting"
+        return nil, err
+    end
+
+    ngx.log(ngx.DEBUG, "eifo.view.getModel({"..key.."})\r\n")
+    for i = 1, #vModel, 1 do
+        ngx.log(ngx.DEBUG, utils.toString(vModel[i], ":", "\r\n"))
+        for k, _ in pairs(vModel.rightCols) do
+            ngx.log(ngx.DEBUG, "Column '"..k.."'\r\n")
+            ngx.log(ngx.DEBUG, utils.toString(vModel[i][k], ":", "\r\n"))
         end
     end
-    local conn = self.connPool.redis()
-    conn:connect()
-    model:load(conn)
-    conn:disconnect()
 
-    ngx.log(ngx.DEBUG, "eifo.view.getModel\n model.entities = {\n"
-            ..utils.toString(model.entities, ":", "\r\n").."\n}\n")
-    for k, v in pairs(model.entities) do
-        ngx.log(ngx.DEBUG, utils.toString(v, ":", "\r\n"))
-    end
-
-    return model
+    return vModel
 end
 eifo.view.getHtml = function(self, model)
     model = model or {}
 
-    ngx.log(ngx.NOTICE, "\r\n\r\n Start rendering: \r\n")
+    ngx.log(ngx.DEBUG, "\r\n\r\n Start rendering: \r\n")
     local template = require("resty.template").new()
-    local fn = template.compile(self.view, "no-cache")
-    ngx.log(ngx.NOTICE, utils.toString(fn))
+    local fn = template.compile(self.template, "no-cache")
+    ngx.log(ngx.DEBUG, utils.toString(fn))
     --ngx.log(ngx.NOTICE, utils.toString(v.compile, ":", "\n"))
-    ngx.log(ngx.NOTICE, "\r\n\r\n End rendering: \r\n")
+    ngx.log(ngx.DEBUG, "\r\n\r\n End rendering: \r\n")
 
     return fn({model = model})
 end
@@ -124,13 +133,14 @@ eifo.view.addSub = function(self, view)
     self.children[view.name] = view
     return self
 end
-eifo.view.createSub = function(self, name, view, layout, model, minParams)
-    local sub = eifo.view.new(name, view, layout, model, minParams, self)
+eifo.view.createSub = function(self, name, template, modelBuilder, minParams)
+    local sub = eifo.view.new(name, template, modelBuilder, minParams, self)
     self:addSub(sub)
     return sub
 end
-eifo.view.new = function(name, view, layout, model, minParams, parent)
+eifo.view.new = function(name, template, modelBuilder, minParams, parent)
     local outLocationUri = (parent and parent.outLocationUri) or ""
+    local basePath = eifo.basePath
     local location = (parent and parent.location) or basePath.."/home" -- TODO: make this configurable
     if name and string.len(name) > 0 then
         outLocationUri = outLocationUri.."/"..name
@@ -142,18 +152,16 @@ eifo.view.new = function(name, view, layout, model, minParams, parent)
         outLocationUri = outLocationUri,
         _observerId = outLocationUri,
         location = location,
-        model = model,
-        view = view,
-        layout = layout,
+        modelBuilder = modelBuilder,
+        template = template,
         minParams = minParams,
         parent = parent,
-        children = {},
-        connPool = connFactory
+        children = {}
     }
     setmetatable(view, {__index = eifo.view})
     -- subscribe to get notifications from EDs:
-    if model then
-        model:_attach(view)
+    if modelBuilder then
+        modelBuilder:_attach(view)
     end
     --ngx.log(ngx.INFO, "\r\n\r\n Render Source Code: \r\n")
     --ngx.log(ngx.INFO, utils.sourceCode(view.render))

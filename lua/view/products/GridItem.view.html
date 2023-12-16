@@ -1,6 +1,18 @@
+{%
+local pContents = model.entities.Product["ProductContent"].entities
+local imgUrl = ""
+if pContents and #pContents > 0 then
+  for i = 1, #pContents, 1 do
+    if pContents[i].values["productContentTypeEnumId"] == "PcntImageUrlSmall" then
+      imgUrl = pContents[i].values["contentLocation"]
+      break
+    end
+  end
+end
+%}
 <div class="w-full md:w-1/3 xl:w-1/4 p-6 flex flex-col">
   <a href="/products/detail/{{model.entities.Product.values.productId}}">
-    <img class="hover:grow hover:shadow-lg" src="/{*model.entities.Product.values.productId*}.webp">
+    <img class="hover:grow hover:shadow-lg" src="{*imgUrl*}">
     <div class="pt-3 flex items-center justify-between">
       <p class="">{{model.entities.Product.values.productName}}</p>
       <svg class="h-6 w-6 fill-current text-gray-500 hover:text-black" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
