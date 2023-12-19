@@ -28,18 +28,21 @@ jQuery, KnockoutJS
 
 ## Server-side rendering
 EIFO generates static htmls. 
+
 When the requested html is not exist, the request will be re-direct to 
  the 'router' (eifo.view), then the router will find a appropriated 'view' based 
  on the request parameter. The view in turn will generate the requested html file. If there is not any view matches the request params, a 401 http code will be returned.
+
  To generate html, the view have to collect data from Redis and fill in the pre-defined resty templates. There are 3 types of objects are involved in this process: models, views and view-models. It's similar to MVVM design pattern, in which the model-view is the bridge between models and views. 
  ### ViewModel is responsible for:
   1. Load needed models for a view
   2. Notify view about entity's changes, so that view can re-generate static html files
 When there is any changes made on related entities, related entities will notify the view models, the view models will query all affected views and notify all them.
 ### ViewModel usages
-The ViewModel is similar to a SQL VIEW. After init, you can left join, right join other 'table's with alias and 'ON' condition, and get access to the column and joined table's records. Please refer to init.lua as usage samples \
+The ViewModel is similar to a SQL VIEW. After init, you can left join, right join other 'table's with alias and 'ON' condition, and get access to the column and joined table's records. Please refer to init.lua as usage samples 
 
-Says we have two tables A and A2A as below:\
+Says we have two tables A and A2A as below:
+
 **Table A:**
 | ID    | Name    | 
 |-------|---------|
@@ -73,10 +76,18 @@ local vmA2A = vmA:rightJoin("A2A", "childAId", "parent")
 vmA2A:leftJoin("parentAId", "children")
 ```
 *Notice the dot '.' and colon ':'*
+
 rightJoin requires 3 params: the dest table name, the dest FK column name, and an alias for the join column in source table
+
 leftJoin requires two params: the FK column name, and an alias to name the list in FK dest table.
-With both options above, after loading, each record of A will have two addition properties: 
-*parent* and *children*, which's names are defined by the *alias*, the last parameter in **rightJoin**; and each record of B will have two addtion properties: *parentA* and *childA* (those names are from column names *parentAId* and *childAId*, removed the trailing *'Id'*). The only differences is the order of loaded records. 
+
+With both options above, after loading: 
+
+each record of A will have two addition properties: *parent* and *children*, which's names are defined by the *alias*, the last parameter in **rightJoin**;  
+
+each record of B will have two addtion properties: *parentA* and *childA* (those names are from column names *parentAId* and *childAId*, removed the trailing *'Id'*). 
+
+The only differences is the order of loaded records. 
 
 To get loaded record, use notation: 
 ```
