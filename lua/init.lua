@@ -40,11 +40,11 @@ function eifo.getAllProducts(cat)
     local products = {}
     local catMems = cat.catMems
     for i = 1, #catMems, 1 do 
-        products[#products + 1] = catMems[i].productId
+        products[#products + 1] = catMems[i].product
     end
     local childCats = cat.children
     for i = 1, #childCats, 1 do 
-        local childCat = childCats[i].productCategoryId
+        local childCat = childCats[i].productCategory
         local childCatPrds = eifo.getAllProducts(childCat)
         for j = 1, #childCatPrds, 1 do 
             products[#products + 1] = childCatPrds[j]

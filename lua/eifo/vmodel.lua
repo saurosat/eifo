@@ -59,6 +59,18 @@ local function newVRecord(selfInstance,...)
                 local groupBy = vModel.groupBy[rightInfo[2]] --> rightInfo[2] is joined column name
                 return groupBy[tbl.key]
             end
+            
+            local fkKey = key.."Id"
+            local leftInfo = selfInstance.leftCols[fkKey]
+            if not leftInfo and string.match(key, "Obj$") then
+                fkKey = key:sub(1, -4)
+                leftInfo = selfInstance.leftCols[fkKey]
+            end
+            if leftInfo then
+                local vModel = selfInstance.leftTables[leftInfo.eName]
+                return vModel.keys[tbl[fkKey]]
+            end
+
             ngx.log(ngx.DEBUG, "Record.key = "..tbl.key..", column = "..key..". Return NULL")
             return nil
         end})
@@ -460,9 +472,9 @@ local function addRecord(selfInstance, ev, conn, reversed, disableFilter)
         local leftCols = selfInstance.leftCols
         for k, v in pairs(leftCols) do
             local vModel = selfInstance.leftTables[v.eName]
-            local fkVRecord = vModel:getRecord(vRecord[k], conn)
-            if fkVRecord then
-                vRecord[k] = fkVRecord
+            local record = vModel:getRecord(vRecord[k])
+            if not record then
+                vModel:loadByKey(vRecord[k], conn)
             end
         end
         -- process right joined columns:
