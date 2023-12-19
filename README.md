@@ -37,8 +37,9 @@ When the requested html is not exist, the request will be re-direct to
   2. Notify view about entity's changes, so that view can re-generate static html files
 When there is any changes made on related entities, related entities will notify the view models, the view models will query all affected views and notify all them.
 ### ViewModel usages
-The ViewModel is similar to a SQL VIEW. After init, you can left join, right join other 'table's with alias and 'ON' condition, and get access to the column and joined table's records. Please refer to init.lua as usage samples
-Says we have two tables A and A2A as below:
+The ViewModel is similar to a SQL VIEW. After init, you can left join, right join other 'table's with alias and 'ON' condition, and get access to the column and joined table's records. Please refer to init.lua as usage samples \
+
+Says we have two tables A and A2A as below:\
 **Table A:**
 | ID    | Name    | 
 |-------|---------|
@@ -55,18 +56,22 @@ Says we have two tables A and A2A as below:
 | A04         | A01         | A01 is parent of A04  | yes     |
 
 We can join two tables as below:
-**Option 1:**
-...
+
+**Option 1:** 
+
+```
 local vmA = eifo.VModelBuilder.new("A")
 local vmA2A = vmA:rightJoin("A2A", "parentAId", "children")
 vmA2A:leftJoin("childAId", "parent")
-...
-**Option 2:**
-...
+```
+
+**Option 2:** 
+
+```
 local vmA = eifo.VModelBuilder.new("A")
 local vmA2A = vmA:rightJoin("A2A", "childAId", "parent")
 vmA2A:leftJoin("parentAId", "children")
-...
+```
 *Notice the dot '.' and colon ':'*
 rightJoin requires 3 params: the dest table name, the dest FK column name, and an alias for the join column in source table
 leftJoin requires two params: the FK column name, and an alias to name the list in FK dest table.
@@ -74,7 +79,7 @@ With both options above, after loading, each record of A will have two addition 
 *parent* and *children*, which's names are defined by the *alias*, the last parameter in **rightJoin**; and each record of B will have two addtion properties: *parentA* and *childA* (those names are from column names *parentAId* and *childAId*, removed the trailing *'Id'*). The only differences is the order of loaded records. 
 
 To get loaded record, use notation: 
-...
+```
 vmA[0] // a record of A
 vmA.keys["A01"] // a record of A
 vmA[1].parent //a record of A
@@ -83,13 +88,13 @@ vmA[1].children // a list of records of A
 vmB[0] // a record of A2A
 vmB[0].parentA // a record of A
 vmB[0].childA // a record of A
-...
+```
 
 #### Query:
-***loadByKey***
-***loadByIds***
-***loadByFk***
-...
+##### *loadByKey*
+##### *loadByIds*
+##### *loadByFk*
+```
 local vmA = eifo.VModelBuilder.new("A")
 local vmA2A = vmA:rightJoin("A2A", "parentAId", "children")
 vmA2A:leftJoin("childAId", "parent")
@@ -98,7 +103,7 @@ local conn = eifo.db.conn.redis()
 conn:connect()
 local vRecord, err = vModel:loadByKey("A01", conn)
 conn:disconnect()
-...
+```
 Records loaded in vmA's model:
 | ID    | Name    | children              |parent       |
 |-------|---------|-----------------------|-------------|
@@ -106,22 +111,23 @@ Records loaded in vmA's model:
 | A02   | name A02| A03(list)             | A01(object) |
 | A03   | name A03|                       | A02(object) |
 | A04   | name A04|                       | A01(object) |
+
 Records loaded in vmB's model:
 | childAId | parentAId | description           | Active | childA  | parentA |
-| (string) | (string)  | (string)              |(string)| (object)| (object)|
 |----------|-----------|-----------------------|--------|---------|---------|
+| (string) | (string)  | (string)              |(string)| (object)| (object)|
 | A02      | A01       | A01 is parent of A02  | yes    | A02     | A01     |
 | A03      | A02       | A02 is parent of A03  | no     | A03     | A02     |
 | A04      | A01       | A01 is parent of A04  | yes    | A04     | A01     |
 
 The first row in vmA is the record we are looking for. The next ones is loaded because of the join statements: A01 load A02 and A04, A02 load A03
 #### Limit the deep for query:
-***maxLevel setting***
-***idOnly setting***
+##### *maxLevel setting*
+##### *idOnly setting*
 #### Select columns:
 #### Joining on conditions
 #### Filtering results
-***Add filters***
-***vModel:select(condition)***
+##### *Add filters*
+##### *vModel:select(condition)*
 #### Event model
 #### Search affected records from an entity change
