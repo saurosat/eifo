@@ -139,6 +139,7 @@ rwmt.hdel = function(self, key, fields, autocommit)
     end
     local oldVals
     local deleteAll
+    local version
     if not fields then
         oldVals = curvals
         deleteAll = true
@@ -151,7 +152,7 @@ rwmt.hdel = function(self, key, fields, autocommit)
             oldVals[fields[i]] = curvals[fields[i]]
             curvals[fields[i]] = nil
         end
-        local version = curvals["version"]
+        version = curvals["version"]
         if version ~= nil then
             local _, numRemainedFields = utils.tbllen(curvals)
             if numRemainedFields <= 2 then

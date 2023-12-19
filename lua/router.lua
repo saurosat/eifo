@@ -3,36 +3,13 @@
 --- Created by tnguyen.
 --- DateTime: 10/11/23 7:55 AM
 ---
-local utils = require("eifo.utils")
-if not home then
-    local view = require("eifo.view")
-    local VModelBuilder = require("eifo.vmodel")
-    -- name, viewTemplate, model, minParams, parent
-    local indexVModel = VModelBuilder.new("index", "_Index")
-    local productVModel = indexVModel:rightJoin("Product", "_idx", "products")
-    local contentVModel = productVModel:rightJoin("ProductContent", "productId", "productContents")
-
-    home = view.new(nil, "index.view.html", indexVModel, 0)
-    -- /eifo/products/
-    -- /eifo/products/Product.DEMO__001
---     local prd = home:createSub("products", "products/index.view.html", model.new():addEntity("Product"), 0)
---     prd:createSub("GridItem", "products/GridItem.view.html", model.new():addEntity1("Product", true, "ProductContent"), 1)
---     prd:createSub("Detail", "products/Detail.view.html", model.new():addEntity1("Product", true, "ProductContent"), 1)
-
---     prd:createSub("ProductDetail", "products/productDetails.view.html", model.new():addEntity("Product"), 1)
-
---     local cat = home:createSub("categories", "categories/index.view.html", 
---             model.new():addEntity("ProductCategory"), 0)
---     cat:createSub("ProductsGridSection", "categories/ProductsGridSection.view.html",]
---             model.new():addEntity("ProductCategory", "Product"), 1)
-
-
---     local promo = home:createSub("promotions", "promotions/index.view.html", model.new():addEntity("ProductStorePromotion"), 0)
---     promo:createSub("carousel", "promotions/carousel.view.html", model.new():addEntity("ProductStorePromotion"), 0)
-    -- ....
+if not eifo.view.home then
+    ngx.log(ngx.ERR, "root view is not initialized")
+    eifo.utils.responseError(ngx.HTTP_SERVICE_UNAVAILABLE, "Service is temporarily down")
+    return
 end
 ngx.log(ngx.INFO, "URI: ____"..ngx.var.request_uri.."_____")
-local params = utils.getPathParam(ngx.var.request_uri)
+local params = eifo.utils.getPathParam(ngx.var.request_uri)
 
 ngx.log(ngx.INFO, table.concat(params, ","))
-home:process(params)
+eifo.view.home:process(params)

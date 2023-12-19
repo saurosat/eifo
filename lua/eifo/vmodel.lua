@@ -47,6 +47,27 @@ local utils = require("eifo.utils")
 local eval = loadstring
 local setmetatable = setmetatable
 local ngx = ngx
+local function getAllChildren(selfInstance, record, key) 
+
+end
+local function newVRecord(selfInstance,...)
+    local vRecord = setmetatable({}, {
+        __index = function(tbl, key)
+            local rightInfo = selfInstance.rightCols[key]
+            if rightInfo then
+                local vModel = selfInstance.rightTables[rightInfo[1]] --> rightInfo[1] is table name
+                local groupBy = vModel.groupBy[rightInfo[2]] --> rightInfo[2] is joined column name
+                return groupBy[tbl.key]
+            end
+            ngx.log(ngx.DEBUG, "Record.key = "..tbl.key..", column = "..key..". Return NULL")
+            return nil
+        end})
+    local colVals = {...}
+    for i = 1, #colVals, 2 do
+        vRecord[colVals[i]] = colVals[i+1]
+    end
+    return vRecord
+end
 
 local function addColumns(selfClass, ...)
     local columns = {...}
@@ -76,6 +97,7 @@ end
 local function addFilter(selfClass, condition, fKeyColumn)
     local sFunction = "local f = function(entity) return "..condition.." end return f"
     local fCondition = assert(eval(sFunction))()
+    ngx.log(ngx.DEBUG, utils.toString(fCondition))
     local filters = (fKeyColumn and selfClass.leftCols[fKeyColumn]) or selfClass.filters
     filters[#filters + 1] = function(ev)
         return fCondition(ev)
@@ -114,6 +136,7 @@ local function leftJoin(selfClass, fKeyColumn, aliasForFkObj, onCondition,...)
     if not vModel then
         vModel, err = eifo.VModelBuilder.new(nil, fkEName)
         if vModel then
+            vModel.toParentCol = aliasForFkObj
             addVModel(selfClass, vModel, 1)
         end
     end
@@ -124,7 +147,6 @@ local function leftJoin(selfClass, fKeyColumn, aliasForFkObj, onCondition,...)
 
     vModel:addColumns(...)
     vModel.rightCols[aliasForFkObj] = {selfClass.ed.ename, fKeyColumn}
-    vModel.toParentCol = aliasForFkObj
     selfClass.leftCols[fKeyColumn] = {eName = vModel.ed.ename}
     return vModel
 end
@@ -154,6 +176,7 @@ local function rightJoin(selfClass, eName, fKeyColumn, alias, onCondition,...)
     if not vModel then
         vModel, err = eifo.VModelBuilder.new(nil, eName)
         if vModel then
+            vModel.toParentCol = fKeyColumn
             addVModel(selfClass, vModel, -1)
         end
     end
@@ -163,7 +186,6 @@ local function rightJoin(selfClass, eName, fKeyColumn, alias, onCondition,...)
     end
     vModel:addColumns(...)
     vModel.leftCols[fKeyColumn] = {eName = selfClass.ed.ename}
-    vModel.toParentCol = fKeyColumn
     if onCondition then
         vModel:addFilter(onCondition, fKeyColumn)
     end
@@ -293,20 +315,24 @@ local function _update(selfClass, ev, oldVals)
 end
 
 local function getRecord(selfInstance, key, conn)
+    if not key then
+        return nil
+    end
     local record = selfInstance.keys[key]
     if not record and conn then
         return selfInstance:loadByKey(key, conn)
     end
     return record
 end
-local function loadByIds(selfInstance, ids, conn, reversed)
+local function loadByIds(selfInstance, ids, conn, reversed, colValues)
     if selfInstance._level >= selfInstance.maxLevel then
         return nil    
     end
     selfInstance._level = selfInstance._level + 1
     local eName = selfInstance.ed.ename
-    local ev = selfInstance.ed[eName]:new(ids):load(conn)
-    if not ev then
+    local ev = selfInstance.ed[eName]:new(ids)
+    local evValues = ev:load(conn)
+    if not evValues then
         local err = "Entity IDs ("..table.concat(ids, ", ")..") not found in "..eName
         ngx.log(ngx.INFO, err)
         selfInstance._level = selfInstance._level - 1
@@ -336,7 +362,15 @@ local function loadByKey(selfInstance, key, conn, reversed)
 end
 local function filterPassed(record, filters)
     for i = 1, #filters, 1 do
-        if not filters[i](record) then
+        local status, pass = pcall(filters[i], record)
+        -- ngx.log(ngx.DEBUG, utils.toString(filters[i])..
+        --     "\r Record: "..utils.toString(record)..
+        --     ".\r Result: status = "..(status and "OK" or "Error")..". Returned = "..(pass and "Pass" or "Failed"))
+        if not status then
+            ngx.log(ngx.ERR, "Filter "..utils.toString(filters[i]).." can not be evaluated")
+            return false
+        end
+        if not pass then
             return false
         end
     end
@@ -360,8 +394,8 @@ local function loadByFk(selfInstance, fKeyColumn, fKeyValue, conn, reversed)
     selfInstance._level = selfInstance._level + 1
     local filters = joinInfo
     local ev = ED[joinInfo.eName]:new({key = fKeyValue}, true)
-    local keys = ev:getChildrenIds(selfInstance.ed.ename, conn)
-    group = utils.newTable(#keys, 0)
+    local keys = ev:getChildrenIds(selfInstance.ed.ename, fKeyColumn, conn) or {}
+    group = (#keys == 0 and {}) or utils.newTable(#keys, 0)
     for i = 1, #keys, 1 do
         local record = selfInstance:getRecord(keys[i])
         if record then
@@ -369,9 +403,18 @@ local function loadByFk(selfInstance, fKeyColumn, fKeyValue, conn, reversed)
                 record = false
             end
         else
-            local childEv = selfInstance.ed:get(keys[i], conn)
-            if filterPassed(record, filters) then
-                record = selfInstance:addRecord(childEv, conn, reversed)
+            local childEv
+            local pass = true;
+            if selfInstance.idOnly then
+                childEv = {values = {}}
+                childEv.values.key = keys[i]
+                childEv.values[fKeyColumn] = fKeyValue
+            else
+                childEv = selfInstance.ed:get(keys[i], conn)
+                pass = filterPassed(childEv.values, filters)
+            end
+            if pass then
+                record = selfInstance:addRecord(childEv, conn, reversed or false, true)
             end
         end
         if record then
@@ -382,11 +425,10 @@ local function loadByFk(selfInstance, fKeyColumn, fKeyValue, conn, reversed)
     selfInstance._level = selfInstance._level - 1
     return group
 end
-
-local function addRecord(selfInstance, ev, conn, reversed)
+local function addRecord(selfInstance, ev, conn, reversed, disableFilter)
     -- unchecked: ev should be of type selfInstance.ed
     -- Apply filters
-    if not filterPassed(ev.values, selfInstance.filters) then
+    if not disableFilter and not filterPassed(ev.values, selfInstance.filters) then
         ngx.log(ngx.DEBUG, ev.key..": filtered out")
         return nil
     end
@@ -395,16 +437,7 @@ local function addRecord(selfInstance, ev, conn, reversed)
     local values = ev.values
     local cols = selfInstance.columns
     local numCols = (cols and #cols) or 0
-    local vRecord = setmetatable({}, {
-        __index = function(tbl, key)
-            local rightInfo = selfInstance.rightCols[key]
-            if rightInfo then
-                local vModel = selfInstance.rightTables[rightInfo[1]] --> rightInfo[1] is table name
-                local groupBy = vModel.groupBy[rightInfo[2]] --> rightInfo[2] is joined column name
-                return groupBy[tbl.key]
-            end
-            return nil
-        end})
+    local vRecord = newVRecord(selfInstance)
     if numCols > 0 then
         for i = 1, numCols, 1 do
             vRecord[cols[i]] = values[cols[i]]
@@ -483,14 +516,33 @@ local function addRecord(selfInstance, ev, conn, reversed)
                 selfInstance.keys[vRecord.key] = nil
                 return nil, errMsg
             end
-            parent:loadByFK(rightInfo[2], vRecord.key, conn, reversed)
+            parent:loadByFk(rightInfo[2], vRecord.key, conn, reversed)
         end
     end
 
     return vRecord
 end
+function select(selfInstance, where)
+    local sFunction = "local f = function(entity) return "..where.." end return f"
+    local fWhere = assert(eval(sFunction))()
+    local numRecords = #selfInstance
+    local records = utils.newTable(numRecords, 0)
+    for i = 1, numRecords, 1 do
+        local status, pass = pcall(fWhere, selfInstance[i])
+        if not status then
+            ngx.log(ngx.ERR, "Filter "..utils.toString(fWhere).." can not be evaluated")
+            return false
+        end
+        if pass then
+            records[#records+1] = selfInstance[i]
+        else
+            ngx.log(ngx.DEBUG, "Record "..selfInstance[i].key.." is filtered out")
+        end
+    end
+    return records
+end
 
-local __instance = utils.newTable(0, 6)
+local __instance = utils.newTable(0, 10)
 __instance.lookup = lookup
 __instance.traverseBack = traverseBack
 __instance.traceBack = traceBack
@@ -499,6 +551,7 @@ __instance.addRecord = addRecord
 __instance.loadByKey = loadByKey
 __instance.loadByIds = loadByIds
 __instance.loadByFk = loadByFk
+__instance.select = select
 __instance._notify = utils.observable._notify
 
 

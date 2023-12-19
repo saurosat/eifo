@@ -84,14 +84,14 @@ _EV.__index = {
         end
         return keyChanged
     end,
-    getChildrenIds = function(self, entityName, conn)
+    getChildrenIds = function(self, entityName, fkColumnName, conn)
         local cEd = eifo.db.ed[entityName]
-        local relKey = self:relKey(cEd)
+        local relKey = self:relKey(cEd, fkColumnName)
         return conn:sgetall(relKey)
     end,
-    getChildren = function(self, entityName, conn, childrenIds)
+    getChildren = function(self, entityName, fkColumnName, conn, childrenIds)
         local cEd = eifo.db.ed[entityName]
-        childrenIds = childrenIds or self:getChildrenIds(entityName, conn)
+        childrenIds = childrenIds or self:getChildrenIds(entityName, fkColumnName, conn)
         local children = utils.newTable(#childrenIds, 0)
         for i = 1, #childrenIds, 1 do
             children[i] = cEd:new({key = childrenIds[i]})
@@ -119,50 +119,26 @@ _EV.__index = {
         self:resetFKeys(memVals)
         return memVals
     end,
-    relKey = function(self, ed)
-        return ed.prefix..PREFIX_SEP..self.values["key"]
-    end,
-    addChild = function(self, childEntity, conn, nocommit)
-        local relKey = self:relKey(childEntity.ed)
-        local num = conn:sadd(relKey, childEntity.values.key)
-        if not nocommit then
-            conn:commit()
-        end
-        return num
-    end,
-    removeChild = function(self, childEntity, conn, nocommit)
-        local relKey = self:relKey(childEntity.ed)
-        local num = conn:sremove(relKey, childEntity.values.key)
-        if not nocommit then
-            conn:commit()
-        end
-        return num
-    end,
     removeOldParents = function(self, oldVals, conn)
         local parents = self.ed:getFKEntities(oldVals)
         if not parents or #parents == 0 then
             return 0
         end
-        local prevParents = utils.newTable(#parents - 1, 0)
-        for i = 1, #parents, 1 do
-            local parent = parents[i]
-            local num = parent:removeChild(self, conn, true)
-            if num == 0 then
-                return nil, "Cannot remove foreign key "..parent.values.key
+        local count = 0
+        for k, v in pairs(parents) do
+            count = count + 1
+            local relKey = v:relKey(self.ed, k)
+            local num = conn:sremove(relKey, v.key)
+            if not num then
+                return nil, "Cannot remove foreign key "..v.key
             end
-            for j = 1, i - 1, 1 do
-                local prevParent = prevParents[j]
-                parent:removeChild(prevParent, conn, true)
-                prevParent:removeChild(parent, conn, true)
-            end
-            prevParents[i] = parent
         end
-        return #parents
+        return count
     end,
     updateParents = function(self, oldVals, conn)
         local curFks = self.values
         if self.values.version > 1 then -- UPDATE
-            local numFkChanges, err = self:removeOldParents(oldVals, conn, true)
+            local numFkChanges, err = self:removeOldParents(oldVals, conn)
             if not numFkChanges then
                 return nil, err
             end
@@ -178,17 +154,24 @@ _EV.__index = {
             end
         end
 
-        local parents = self.ed:getFKEntities(curFks)
-        if not parents or #parents == 0 then
+        local fkEntities = self.ed:getFKEntities(curFks)
+        if not fkEntities or utils.isTableEmpty(fkEntities) then
             return 0
         end
-        for i = 1, #parents, 1 do
-            local ok, err = parents[i]:addChild(self, conn, true)
-            if not ok then
-                return nil, "Cannot add foreign key '"..parents[i].values.key.."': "..(err or " Unknown error")
+        local count = 0
+        for k, v in pairs(fkEntities) do
+            count = count + 1
+            local relKey = v:relKey(self.ed, k)
+            local num = conn:sadd(relKey, self.values.key)
+    
+            if not num then
+                return nil, "Cannot add foreign key '"..self.values.key.."' into"..relKey
             end
         end
-        return #parents
+        return count
+    end,
+    relKey = function (self, childED, fkColumn)
+        return childED.prefix..PREFIX_SEP..fkColumn..PREFIX_SEP..self.values["key"]
     end,
     _fail = function(conn, errMsg, nocommit)
         if not nocommit then
@@ -347,13 +330,10 @@ _ED.__index = {
             return {}
         end
         local fkFields = self.fnFKs
-        local _, numFks = utils.tbllen(fkFields)
-        local fKEntities = utils.newTable(numFks, 0)
-        local i = 1
+        local fKEntities = {}
         for fnFK, enFK in pairs(fkFields) do
             if entityData[fnFK] ~= nil then
-                fKEntities[i] = eifo.db.ed[enFK]:new({key = entityData[fnFK] })
-                i = i + 1
+                fKEntities[fnFK] = eifo.db.ed[enFK]:new({key = entityData[fnFK] })
             end
         end
         return fKEntities
