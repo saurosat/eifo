@@ -3,12 +3,12 @@
 --- Created by tnguyen.
 --- DateTime: 12/13/23 10:08 AM
 ---
-local VModelBuilder = require("eifo.vmodel")
+local VModelBuilder = eifo.VModelBuilder
 local productView = VModelBuilder.new(nil, "Product")
 local pcmView = productView:rightJoin("ProductCategoryMember", "productId", "categories")
 productView:rightJoin("ProductContent", "productId", "productContents")
 local productModel = productView:newVModel()
-local conn = require("eifo.dbconn").redis()
+local conn = eifo.db.conn.redis()
 conn:connect()
 productModel:loadByKey("p:DEMO_002", conn)
 conn:disconnect()

@@ -22,6 +22,21 @@ jQuery, KnockoutJS
 ## Quick Start:
 + Install Redis Stack Server
 + Install OpenResty and update $PATH variable to include nginx execution file (nginx is packed inside OpenResty)
++ Install LuaRock:
+* Download the LuaRocks tarball from https://luarocks.org/releases, extract it
+* cd to extracted folder
+* Run following commands:
+```
+// MacOS: LUA_HOME=/usr/local/Cellar/openresty/1.21.4.2_1/luajit 
+// Linux: 
+LUA_HOME=/usr/local/openresty/luajit
+./configure --prefix=$LUA_HOME --with-lua=$LUA_HOME --lua-suffix=jit \
+            --with-lua-include=$LUA_HOME/include/luajit-2.1
+make
+sudo make install
+cd $LUA_HOME/bin
+luarocks install magick
+```
 + Open [EIFO ProjectHome]/conf/nginx.conf, check all configs
 + Start Redis Stack Server: redis-stack-server (you can start it as daemon)
 + Start Nginx: nginx -p [EIFO ProjectHome] -c [EIFO ProjectHome]/conf/nginx.conf (Using relative path is ok)

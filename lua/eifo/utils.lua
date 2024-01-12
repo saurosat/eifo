@@ -3,18 +3,102 @@
 --- Created by tnguyen.
 --- DateTime: 9/14/23 5:00 PM
 ---
-if not eifo then
-    eifo = {}
+ngx.log(ngx.INFO, "Initilizing utils...")
+local newTable, newArray, newHashTbl
+if table.new then
+    newTable = table.new
+    newArray = function (size)
+        return table.new(size, 0)
+    end
+    newHashTbl = function (size)
+        return table.new(0, size)
+    end
+else
+    newTable = function (...) return {} end
+    newArray = newTable
+    newHashTbl = newTable
 end
-if eifo.utils then
-    return eifo.utils
+local isTableEmpty = function(tbl)
+    return not tbl or next(tbl) == nil
 end
-
-local newTable
-do
-    local ok
-    ok, newTable = pcall(require, "table.new")
-    if not ok then newTable = function(...) return {} end end
+local isArray = function(tbl)
+    return not tbl or (type(tbl) == 'table' and (#tbl > 0 or next(tbl) == nil))
+end
+local isHashTbl = function(tbl)
+    return not tbl or type(tbl) == 'table' and #tbl == 0
+end
+local tbllen = function(tbl)
+    if not tbl then
+        return 0, 0
+    end
+    local len = 0
+    local k = next(tbl)
+    while k ~= nil do
+        k = next(tbl, k)
+        len = len + 1
+    end
+    local arrlen = #tbl
+    return arrlen, len - arrlen
+end
+local function sourceCode(f)
+    local t = debug.getinfo(f)
+    return t.source
+    --if t.linedefined < 0 then return t.source end
+    --local i = 0
+    --local text = {}
+    --local name = t.source:gsub("^@","")
+    --if not name then
+    --    return t.source
+    --end
+    --for line in io.lines(name) do
+    --    i=i+1
+    --    if i >= t.linedefined then text[#text+1] = line end
+    --    if i >= t.lastlinedefined then break end
+    --end
+    --return table.concat(text,"\n")
+end
+local function toString(v, kvSep, newLine, refs)
+    if v == nil then return "nil" end
+    if not v then return "false" end
+    local vType = type(v)
+    local strTab = "\r"
+    -- prevent circular invokes:
+    if not refs or #refs == 0 then
+        refs = {v}
+    else
+        local refsLen = #refs
+        for i = 1, refsLen, 1 do
+            strTab = strTab.."    "
+            if v == refs[i] then
+                return vType
+            end
+        end
+        refs[refsLen + 1] = v
+    end
+    local str
+    if vType == "table" then
+        kvSep = kvSep or ":"
+        newLine = newLine or "<br>"
+        str = strTab.."{"
+        if #v > 0 then
+            str = str..strTab.."    "..toString(v[1], kvSep, newLine, refs)
+            for i = 2, #v, 1 do
+                str = str..", "..strTab.."    "..toString(v[i], kvSep, newLine, refs)
+            end
+        else
+            for key, val in pairs(v) do
+                str = str..strTab.."    "..key..kvSep..toString(val, kvSep, newLine, refs)
+            end
+        end
+        str = strTab..str.."}"
+    end
+    refs[#refs] = nil
+    return  str
+            or (vType == "string" and v)
+            or (vType == "number" and _G.tostring(v))
+            or (vType == "boolean" and "true")
+            or (vType == "function" and sourceCode(v))
+            or vType
 end
 
 local attach = function(self, observer)
@@ -42,15 +126,15 @@ local detach = function(self, observerId)
     return self
 end
 local notify = function(self, oldVals)
-    ngx.log(ngx.DEBUG, "Sender: "..eifo.utils.toString(self, ": ", "\r\n"))
-    ngx.log(ngx.DEBUG, "oldVals: "..eifo.utils.toString(oldVals, ": ", "\r\n"))
+    ngx.log(ngx.DEBUG, "Sender: "..toString(self, ": ", "\r\n"))
+    ngx.log(ngx.DEBUG, "oldVals: "..toString(oldVals, ": ", "\r\n"))
 
-    if not self._observers or eifo.utils.isTableEmpty(self._observers) then
-        ngx.log(ngx.ALERT, "Notify without any receivers: "..eifo.utils.toString(self, ": ", "\r\n"))
+    if not self._observers or isTableEmpty(self._observers) then
+        ngx.log(ngx.ALERT, "Notify without any receivers: "..toString(self, ": ", "\r\n"))
         return false, "No receivers"
     end
     for _, v in pairs(self._observers) do
-        ngx.log(ngx.DEBUG, "Receiver: "..eifo.utils.toString(v, ": ", "\r\n"))
+        ngx.log(ngx.DEBUG, "Receiver: "..toString(v, ": ", "\r\n"))
         v:_update(self, oldVals)
     end
     return true
@@ -75,34 +159,12 @@ _lifo.__index = {
     len = function(self) return #self.values   end
 }
 local lifo = function(initialValues)
-    if not eifo.utils.isArray(initialValues) then
+    if not isArray(initialValues) then
         return nil, "input table must be an array"
     end
 
     initialValues = initialValues or {}
     return setmetatable({values = initialValues}, _lifo)
-end
-local isTableEmpty = function(tbl)
-    return not tbl or next(tbl) == nil
-end
-local isArray = function(tbl)
-    return not tbl or (type(tbl) == 'table' and (#tbl > 0 or next(tbl) == nil))
-end
-local isHashTbl = function(tbl)
-    return not tbl or type(tbl) == 'table' and #tbl == 0
-end
-local tbllen = function(tbl)
-    if not tbl then
-        return 0, 0
-    end
-    local len = 0
-    local k = next(tbl)
-    while k ~= nil do
-        k = next(tbl, k)
-        len = len + 1
-    end
-    local arrlen = #tbl
-    return arrlen, len - arrlen
 end
 local existIn = function(array, item, from, to)
     local i = from or #array
@@ -132,8 +194,8 @@ local existIn = function(array, item, from, to)
     return i
 end
 local keys = function(tbl)
-    local _, hlen = eifo.utils.tbllen(tbl)
-    local keys = eifo.utils.newTable(0, hlen)
+    local _, hlen = tbllen(tbl)
+    local keys = newTable(0, hlen)
     local i=0
     for k,_ in pairs(tbl) do
         i=i+1
@@ -141,8 +203,21 @@ local keys = function(tbl)
     end
     return keys
 end
-
-
+---check existence by using 'key' property
+---@param array any
+---@param record any
+---@return number index of existing array item, or new array length
+local addIfNotExist = function(array, record)
+    local idx, len = 1, #array
+    while idx <= len do
+        if array[idx] == record or array[idx].key == record.key then
+            return idx
+        end
+        idx = idx + 1
+    end
+    array[idx] = record
+    return idx
+end
 local responseError = function(httpStatus, errMessage)
     ngx.status = httpStatus
     ngx.say("{'message':'"..errMessage.."'}")
@@ -222,101 +297,78 @@ local getPathParam = function(uri, api)
     end
     return splitStr(paramStr, "/")
 end
-local function sourceCode(f)
-    local t = debug.getinfo(f)
-    return t.source
-    --if t.linedefined < 0 then return t.source end
-    --local i = 0
-    --local text = {}
-    --local name = t.source:gsub("^@","")
-    --if not name then
-    --    return t.source
-    --end
-    --for line in io.lines(name) do
-    --    i=i+1
-    --    if i >= t.linedefined then text[#text+1] = line end
-    --    if i >= t.lastlinedefined then break end
-    --end
-    --return table.concat(text,"\n")
-end
-local function toString(v, kvSep, newLine, refs)
-    if v == nil then return "nil" end
-    if not v then return "false" end
-    local vType = type(v)
-    local strTab = "\r"
-    -- prevent circular invokes:
-    if not refs or #refs == 0 then
-        refs = {v}
-    else
-        local refsLen = #refs
-        for i = 1, refsLen, 1 do
-            strTab = strTab.."    "
-            if v == refs[i] then
-                return vType
-            end
-        end
-        refs[refsLen + 1] = v
-    end
-    local str
-    if vType == "table" then
-        kvSep = kvSep or ":"
-        newLine = newLine or "<br>"
-        str = strTab.."{"
-        if #v > 0 then
-            str = str..strTab.."    "..toString(v[1], kvSep, newLine, refs)
-            for i = 2, #v, 1 do
-                str = str..", "..strTab.."    "..toString(v[i], kvSep, newLine, refs)
-            end
-        else
-            for key, val in pairs(v) do
-                str = str..strTab.."    "..key..kvSep..toString(val, kvSep, newLine, refs)
-            end
-        end
-        str = strTab..str.."}"
-    end
-    refs[#refs] = nil
-    return  str
-            or (vType == "string" and v)
-            or (vType == "number" and _G.tostring(v))
-            or (vType == "boolean" and "true")
-            or (vType == "function" and sourceCode(v))
-            or vType
-end
-eifo.utils = newTable(0, 20)
-eifo.utils.sourceCode = sourceCode
-eifo.utils.splitStr = splitStr
-eifo.utils.getPathParam = getPathParam
-eifo.utils.newTable = newTable
-eifo.utils.isArray = isArray
-eifo.utils.existIn = existIn
-eifo.utils.isHashTbl = isHashTbl
-eifo.utils.isTableEmpty = isTableEmpty
-eifo.utils.keys = keys
-eifo.utils.popKey = popKey
-eifo.utils.removeItem = removeItem
-eifo.utils.mergeRef = mergeRef
-eifo.utils.listToHash = listToHash
-eifo.utils.tbllen = tbllen
-eifo.utils.toString = toString
-eifo.utils.printTable = function(tbl)
+local utils = newTable(0, 26)
+utils.sourceCode = sourceCode
+utils.splitStr = splitStr
+utils.getPathParam = getPathParam
+utils.newTable = newTable
+utils.newArray = newArray
+utils.newHashTbl = newHashTbl
+utils.isArray = isArray
+utils.existIn = existIn
+utils.isHashTbl = isHashTbl
+utils.isTableEmpty = isTableEmpty
+utils.keys = keys
+utils.popKey = popKey
+utils.removeItem = removeItem
+utils.mergeRef = mergeRef
+utils.listToHash = listToHash
+utils.tbllen = tbllen
+utils.toString = toString
+utils.addIfNotExist = addIfNotExist
+utils.printTable = function(tbl)
     if not tbl then
         ngx.say("Table is null")
         return
     end
     for k,v in pairs(tbl) do
-        ngx.say (k..": "..eifo.utils.toString(v).."<br/>")
+        ngx.say (k..": "..utils.toString(v).."<br/>")
     end
 end
 
-eifo.utils.lifo = lifo
+utils.lifo = lifo
 
-eifo.utils.responseError = responseError
+utils.responseError = responseError
 
-
-eifo.utils.observable = {
+utils.ArraySet = {
+    add = function(self, record)
+        for idx = #self, 1, -1 do
+            if self[idx] == record or self[idx].key == record.key then
+                return idx
+            end
+        end
+        local idx = #self + 1
+        self[idx] = record
+        return idx
+    end,
+    index = function (self, itemOrKey)
+        local itemKey = itemOrKey.key or itemOrKey
+        for i = #self, 1, -1 do
+            if self[i] == itemOrKey or self[i].key == itemKey then
+                return i
+            end
+        end
+        return nil
+    end,
+    intersect = function(self, otherSet)
+        local arraySet = utils.ArraySet.new()
+        for i = #otherSet, 1, -1 do
+            if self:index(otherSet[i]) then
+                arraySet:add(otherSet[i])
+            end
+        end
+        return arraySet
+    end,
+    new = function (self)
+        local arraySet = (self and #self > 0 and {table.unpack(self)}) or {}
+        setmetatable(arraySet, {__index = utils.ArraySet})
+        return arraySet
+    end
+}
+utils.observable = {
     _attach = attach,
     _detach = detach,
     _notify = notify
 }
 
-return eifo.utils
+return utils

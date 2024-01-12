@@ -3,7 +3,7 @@
 --- Created by tnguyen.
 --- DateTime: 10/11/23 7:55 AM
 ---
-if not eifo.view.home then
+if not eifo.view.index then
     ngx.log(ngx.ERR, "root view is not initialized")
     eifo.utils.responseError(ngx.HTTP_SERVICE_UNAVAILABLE, "Service is temporarily down")
     return
@@ -12,4 +12,4 @@ ngx.log(ngx.INFO, "URI: ____"..ngx.var.request_uri.."_____")
 local params = eifo.utils.getPathParam(ngx.var.request_uri)
 
 ngx.log(ngx.INFO, table.concat(params, ","))
-eifo.view.home:process(params)
+eifo.view.index:process(params)

@@ -4,25 +4,19 @@
 --- DateTime: 10/10/23 9:30 AM
 ---
 -- TODO: store workPermit in Shared Dict instead of Redis
-if not eifo then
-    eifo = {}
-end
-if eifo.workPermit then
-    return eifo.workPermit
-end
-eifo.workPermit = {}
-local utils = require("eifo.utils")
-eifo.workPermit.seperator = ","
-eifo.workPermit.create = function(key, evKey, conn)
+local utils = eifo.utils
+local workPermit = {}
+workPermit.seperator = ","
+workPermit.create = function(key, evKey, conn)
     key = "wp:"..key
-    evKey = eifo.workPermit.seperator..evKey
+    evKey = workPermit.seperator..evKey
     return conn:append(key, evKey)
 end
-eifo.workPermit.get = function(key, conn)
+workPermit.get = function(key, conn)
     local evKeyStr = conn:getdel(key)
     if evKeyStr ~= nil and type(evKeyStr) == "string" then
-        return utils.splitStr(evKeyStr, eifo.workPermit.seperator)
+        return utils.splitStr(evKeyStr, workPermit.seperator)
     end
     return nil, "Work Permit not exist"
 end
-return eifo.workPermit
+return workPermit

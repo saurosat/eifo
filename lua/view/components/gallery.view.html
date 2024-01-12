@@ -1,0 +1,25 @@
+<div class="w-full max-h-screen px-4 md:w-2/3">
+    <div class="overflow-hidden h-4/5 grid gap-2 grid-rows-5 grid-cols-6 md:auto-rows-auto">
+      <nav class="flex md:block grid-cols-subgrid col-span-6 md:col-span-1 md:grid-rows-subgrid md:row-span-5 overflow-x-scroll md:overflow-x-hidden overflow-y-hidden md:overflow-y-scroll row-start-5 md:row-start-auto ">
+{%
+  for k, v in pairs(images) do 
+    local imgUrl = v["100x100"] 
+%}          
+        <a href="#{*k*}" class="flex mr-2 min-w-12 min-h-12 md:min-w-full md:mb-2">
+          <img class="object-cover saturate-0 transition-all hover:saturate-100 hover:scale-105" src="{*v['100x100']*}" alt="Image not available" />
+        </a>
+{%
+  end
+%}
+      </nav>
+      <div class="block grid-rows-subgrid row-span-4 md:row-span-5 md:grid-cols-subgrid col-span-6 md:col-span-5 overflow-y-hidden overflow-x-scroll">
+{%
+  for k, v in pairs(images) do 
+%}          
+        <img class="h-full mb-2 object-cover" id="{*k*}" src="{*v.key*}" alt="Image not available" />
+{%
+  end
+%}
+      </div>
+    </div>
+</div>

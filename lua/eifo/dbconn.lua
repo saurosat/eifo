@@ -3,16 +3,6 @@
 --- Created by tnguyen.
 --- DateTime: 9/17/23 9:42 AM
 ---
-if not eifo then
-    eifo = {}
-end
-if not eifo.db then
-    eifo.db = {}
-end
-
-if eifo.db.conn then
-    return eifo.db.conn
-end
 local utils = eifo.utils
 
 local rwmt = utils.newTable(0, 18)
@@ -236,7 +226,7 @@ local RW = {
 
 local redisAgent = require "resty.redis"
 
-eifo.db.conn = {
+local connFactory = {
     host = "127.0.0.1",
     port = "6379",
     poolsize = 100,
@@ -262,4 +252,4 @@ eifo.db.conn = {
     end
 }
 
-return eifo.db.conn
+return connFactory

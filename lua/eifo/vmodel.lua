@@ -36,173 +36,20 @@
 ---         For the case of index page, we have to make a 'index' virtual ED in dao.lua, and create FK
 ---         in other EDs (Category) to it
 ---
-if not eifo then
-    eifo = {}
-end
-if eifo.VModelBuilder then
-    return eifo.VModelBuilder
-end
-local ED = require("eifo.dao")
-local utils = require("eifo.utils")
+require "eifo.vrecord"
+local ED = eifo.db.ed
+local utils = eifo.utils
 local eval = loadstring
 local setmetatable = setmetatable
 local ngx = ngx
-local function getAllChildren(selfInstance, record, key) 
-
-end
-local function newVRecord(selfInstance,...)
-    local vRecord = setmetatable({}, {
-        __index = function(tbl, key)
-            local rightInfo = selfInstance.rightCols[key]
-            if rightInfo then
-                local vModel = selfInstance.rightTables[rightInfo[1]] --> rightInfo[1] is table name
-                local groupBy = vModel.groupBy[rightInfo[2]] --> rightInfo[2] is joined column name
-                return groupBy[tbl.key]
-            end
-            
-            local fkKey = key.."Id"
-            local leftInfo = selfInstance.leftCols[fkKey]
-            if not leftInfo and string.match(key, "Obj$") then
-                fkKey = key:sub(1, -4)
-                leftInfo = selfInstance.leftCols[fkKey]
-            end
-            if leftInfo then
-                local vModel = selfInstance.leftTables[leftInfo.eName]
-                return vModel.keys[tbl[fkKey]]
-            end
-
-            ngx.log(ngx.DEBUG, "Record.key = "..tbl.key..", column = "..key..". Return NULL")
-            return nil
-        end})
-    local colVals = {...}
-    for i = 1, #colVals, 2 do
-        vRecord[colVals[i]] = colVals[i+1]
+local VModelBuilder = utils.newHashTbl(3)
+VModelBuilder.registry = {}
+local function newVRecord(selfInstance, evValues)
+    local vrClass = eifo.vrecord[selfInstance.ed.ename]
+    if not vrClass then
+        vrClass = eifo.vrecord
     end
-    return vRecord
-end
-
-local function addColumns(selfClass, ...)
-    local columns = {...}
-    local numCols = #columns
-    if numCols == 0 then
-        return selfClass
-    end
-
-    local selfColumns = selfClass.columns
-    local numSelfCols = #selfColumns
-    local col
-    for i = 1, numCols, 1 do
-        col = columns[i]
-        for j = 1, numSelfCols, 1 do
-            if col == selfColumns[j] then
-                col = nil
-                break
-            end
-        end
-        if col then
-            numSelfCols = numSelfCols + 1
-            selfColumns[numSelfCols] = col
-        end
-    end
-    return selfClass
-end
-local function addFilter(selfClass, condition, fKeyColumn)
-    local sFunction = "local f = function(entity) return "..condition.." end return f"
-    local fCondition = assert(eval(sFunction))()
-    ngx.log(ngx.DEBUG, utils.toString(fCondition))
-    local filters = (fKeyColumn and selfClass.leftCols[fKeyColumn]) or selfClass.filters
-    filters[#filters + 1] = function(ev)
-        return fCondition(ev)
-    end
-    return selfClass
-end
-local function addVModel(self, vModel, pos)
-    local modelEName = vModel.ed.ename
-    if pos > 0 then
-        self.leftTables[modelEName] = vModel
-    else
-        self.rightTables[modelEName] = vModel
-    end
-    vModel.parent = self
-    vModel.posInParent = pos
-    ngx.log(ngx.DEBUG, "Reference to self is "
-            ..(((self.leftTables[modelEName] or self.rightTables[modelEName]) and "OK") or "Failed"))
-    return vModel
-end
-local function leftJoin(selfClass, fKeyColumn, aliasForFkObj, onCondition,...)
-    local selfEName = selfClass.ed.ename
-    local edFKs = selfClass.ed.fnFKs;
-    local fkEName = edFKs[fKeyColumn]
-    if not fkEName then
-        local errMsg = "Entity '"..selfEName.."' does not have FK column "..fKeyColumn
-        ngx.log(ngx.ERR, errMsg)
-        return nil, errMsg
-    end
-    if selfClass.leftCols[fKeyColumn] then
-        return selfClass.leftTables[fkEName]
-    end
-
-    ngx.log(ngx.DEBUG, "Adding Left join "..selfEName.." TO "..fkEName)
-
-    local vModel, err = selfClass.leftTables[fkEName], nil
-    if not vModel then
-        vModel, err = eifo.VModelBuilder.new(nil, fkEName)
-        if vModel then
-            vModel.toParentCol = aliasForFkObj
-            addVModel(selfClass, vModel, 1)
-        end
-    end
-    if not vModel then
-        ngx.log(ngx.ERR, err)
-        return nil, err
-    end
-
-    vModel:addColumns(...)
-    vModel.rightCols[aliasForFkObj] = {selfClass.ed.ename, fKeyColumn}
-    selfClass.leftCols[fKeyColumn] = {eName = vModel.ed.ename}
-    return vModel
-end
-local function rightJoin(selfClass, eName, fKeyColumn, alias, onCondition,...)
-    if selfClass.rightCols[alias] then
-        return selfClass.rightTables[eName]
-    end
-    local ed = ED[eName]
-    if not ed then
-        local errMsg = "Entity name '".. eName .."' not found "
-        ngx.log(ngx.ERR, errMsg)
-        return nil, errMsg
-    end
-    local selfEName = ed.fnFKs[fKeyColumn]
-    if not selfEName or selfEName ~= selfClass.ed.ename then
-        local errMsg = "Entity name '"..eName.."' does not have FK relationship to "..selfClass.ed.ename
-        ngx.log(ngx.ERR, errMsg)
-        return nil, errMsg
-    end
-
-    local vModel, err = selfClass.rightTables[eName], nil
-    if vModel and vModel.leftCols[fKeyColumn] then
-        return vModel
-    end
-
-    ngx.log(ngx.DEBUG, "Adding Right join "..selfClass.ed.ename.." TO "..eName)
-    if not vModel then
-        vModel, err = eifo.VModelBuilder.new(nil, eName)
-        if vModel then
-            vModel.toParentCol = fKeyColumn
-            addVModel(selfClass, vModel, -1)
-        end
-    end
-    if not vModel then
-        ngx.log(ngx.ERR, err)
-        return nil, err
-    end
-    vModel:addColumns(...)
-    vModel.leftCols[fKeyColumn] = {eName = selfClass.ed.ename}
-    if onCondition then
-        vModel:addFilter(onCondition, fKeyColumn)
-    end
-    selfClass.rightCols[alias] = {eName, fKeyColumn}
-    return vModel
+    return vrClass:newInstance(selfInstance, evValues or {})
 end
 
 --- Look for vModel that having given main Entity Definition
@@ -301,30 +148,6 @@ local function traceBack(self)
     end
     return curNode
 end
-local function _update(selfClass, ev, oldVals)
-    ngx.log(ngx.DEBUG, "VModelBuilder '"..selfClass.name.."' UPDATING: \r\n"
-            ..utils.toString(ev, ": ", "\r\n"))
-    if not ev.key then
-        local ok, err = ev:resetKey()
-        if not ok then
-            return ok, err
-        end
-    end
-    local vModel = selfClass:newVModel(true)
-    local conn = require("eifo.dbconn").redis()
-    conn:connect()
-    local vRecord, err = vModel:loadByKey(ev.values.key, conn, true)
-    conn:disconnect()
-    if not vRecord then
-        local errMsg = "Can not find entity while updating for key '"
-            ..ev.key.."'. Please check maxLevel setting"..err
-        ngx.log(ngx.CRIT, errMsg)
-        return nil, errMsg
-    end
-    local topVModel = vModel:traceBack()
-    topVModel:_notify(oldVals)
-    return topVModel
-end
 
 local function getRecord(selfInstance, key, conn)
     if not key then
@@ -350,8 +173,12 @@ local function loadByIds(selfInstance, ids, conn, reversed, colValues)
         selfInstance._level = selfInstance._level - 1
         return nil, err
     end
+    local vRecord = selfInstance:addRecord(ev, conn, reversed)
     selfInstance._level = selfInstance._level - 1
-    return selfInstance:addRecord(ev, conn, reversed)
+    if selfInstance.onLoaded and selfInstance._level == 0 and not reversed then
+        selfInstance:onLoaded(vRecord)
+    end
+    return vRecord
 end
 local function loadByKey(selfInstance, key, conn, reversed)
     ngx.log(ngx.DEBUG, selfInstance.ed.ename.."loadByKey '"..key.."', level="..selfInstance._level
@@ -370,6 +197,9 @@ local function loadByKey(selfInstance, key, conn, reversed)
     end
     local vRecord = selfInstance:addRecord(ev, conn, reversed)
     selfInstance._level = selfInstance._level - 1
+    if selfInstance.onLoaded and selfInstance._level == 0 and not reversed then
+        selfInstance:onLoaded(vRecord)
+    end
     return vRecord
 end
 local function filterPassed(record, filters)
@@ -388,6 +218,7 @@ local function filterPassed(record, filters)
     end
     return true
 end
+
 local function loadByFk(selfInstance, fKeyColumn, fKeyValue, conn, reversed)
     local group = selfInstance.groupBy[fKeyColumn][fKeyValue]
     if group then
@@ -407,7 +238,8 @@ local function loadByFk(selfInstance, fKeyColumn, fKeyValue, conn, reversed)
     local filters = joinInfo
     local ev = ED[joinInfo.eName]:new({key = fKeyValue}, true)
     local keys = ev:getChildrenIds(selfInstance.ed.ename, fKeyColumn, conn) or {}
-    group = (#keys == 0 and {}) or utils.newTable(#keys, 0)
+
+    group = utils.ArraySet.new()
     for i = 1, #keys, 1 do
         local record = selfInstance:getRecord(keys[i])
         if record then
@@ -430,11 +262,14 @@ local function loadByFk(selfInstance, fKeyColumn, fKeyValue, conn, reversed)
             end
         end
         if record then
-            group[#group + 1] = record
+            group:add(record)
         end
     end
     selfInstance.groupBy[fKeyColumn][fKeyValue] = group
     selfInstance._level = selfInstance._level - 1
+    if selfInstance.onLoaded and selfInstance._level == 0 and not reversed then
+        selfInstance:onLoaded(table.unpack(group))
+    end
     return group
 end
 local function addRecord(selfInstance, ev, conn, reversed, disableFilter)
@@ -472,10 +307,14 @@ local function addRecord(selfInstance, ev, conn, reversed, disableFilter)
         local leftCols = selfInstance.leftCols
         for k, v in pairs(leftCols) do
             local vModel = selfInstance.leftTables[v.eName]
-            local record = vModel:getRecord(vRecord[k])
-            if not record then
-                vModel:loadByKey(vRecord[k], conn)
+            local leftRecord = vModel:getRecord(vRecord[k])
+            if not leftRecord then
+                leftRecord = vModel:loadByKey(vRecord[k], conn)
             end
+            if not selfInstance.groupBy[k][v] then
+                selfInstance.groupBy[k][v] = utils.ArraySet.new()
+            end
+            selfInstance.groupBy[k][v]:add(vRecord)
         end
         -- process right joined columns:
         local rightCols = selfInstance.rightCols
@@ -483,6 +322,9 @@ local function addRecord(selfInstance, ev, conn, reversed, disableFilter)
             ngx.log(ngx.DEBUG, selfInstance.ed.ename.." right join to "..v[1]..", column "..v[2])
             local vModel = selfInstance.rightTables[v[1]] --> v[1] is table name
             vModel:loadByFk(v[2], vRecord.key, conn)
+        end
+        if vRecord.onLoaded then
+            vRecord:onLoaded()
         end
     else
         local parent = selfInstance.parent
@@ -554,7 +396,7 @@ function select(selfInstance, where)
     return records
 end
 
-local __instance = utils.newTable(0, 10)
+local __instance = utils.ArraySet.new()
 __instance.lookup = lookup
 __instance.traverseBack = traverseBack
 __instance.traceBack = traceBack
@@ -566,6 +408,154 @@ __instance.loadByFk = loadByFk
 __instance.select = select
 __instance._notify = utils.observable._notify
 
+
+local function addColumns(selfClass, ...)
+    local columns = {...}
+    local numCols = #columns
+    if numCols == 0 then
+        return selfClass
+    end
+
+    local selfColumns = selfClass.columns
+    local numSelfCols = #selfColumns
+    local col
+    for i = 1, numCols, 1 do
+        col = columns[i]
+        for j = 1, numSelfCols, 1 do
+            if col == selfColumns[j] then
+                col = nil
+                break
+            end
+        end
+        if col then
+            numSelfCols = numSelfCols + 1
+            selfColumns[numSelfCols] = col
+        end
+    end
+    return selfClass
+end
+local function addFilter(selfClass, condition, fKeyColumn)
+    local sFunction = "local f = function(entity) return "..condition.." end return f"
+    local fCondition = assert(eval(sFunction))()
+    ngx.log(ngx.DEBUG, utils.toString(fCondition))
+    local filters = (fKeyColumn and selfClass.leftCols[fKeyColumn]) or selfClass.filters
+    filters[#filters + 1] = function(ev)
+        return fCondition(ev)
+    end
+    return selfClass
+end
+local function addVModel(self, vModel, pos)
+    local modelEName = vModel.ed.ename
+    if pos > 0 then
+        self.leftTables[modelEName] = vModel
+    else
+        self.rightTables[modelEName] = vModel
+    end
+    vModel.parent = self
+    vModel.posInParent = pos
+    ngx.log(ngx.DEBUG, "Reference to self is "
+            ..(((self.leftTables[modelEName] or self.rightTables[modelEName]) and "OK") or "Failed"))
+    return vModel
+end
+local function leftJoin(selfClass, fKeyColumn, aliasForFkObj, onCondition,...)
+    local selfEName = selfClass.ed.ename
+    local edFKs = selfClass.ed.fnFKs;
+    local fkEName = edFKs[fKeyColumn]
+    if not fkEName then
+        local errMsg = "Entity '"..selfEName.."' does not have FK column "..fKeyColumn
+        ngx.log(ngx.ERR, errMsg)
+        return nil, errMsg
+    end
+    if selfClass.leftCols[fKeyColumn] then
+        return selfClass.leftTables[fkEName]
+    end
+
+    ngx.log(ngx.DEBUG, "Adding Left join "..selfEName.." TO "..fkEName)
+
+    local vModel, err = selfClass.leftTables[fkEName], nil
+    if not vModel then
+        vModel, err = VModelBuilder.new(nil, fkEName)
+        if vModel then
+            vModel.toParentCol = aliasForFkObj
+            addVModel(selfClass, vModel, 1)
+        end
+    end
+    if not vModel then
+        ngx.log(ngx.ERR, err)
+        return nil, err
+    end
+
+    vModel:addColumns(...)
+    vModel.rightCols[aliasForFkObj] = {selfClass.ed.ename, fKeyColumn}
+    selfClass.leftCols[fKeyColumn] = {eName = vModel.ed.ename}
+    return vModel
+end
+local function rightJoin(selfClass, eName, fKeyColumn, alias, onCondition,...)
+    if selfClass.rightCols[alias] then
+        return selfClass.rightTables[eName]
+    end
+    local ed = ED[eName]
+    if not ed then
+        local errMsg = "Entity name '".. eName .."' not found "
+        ngx.log(ngx.ERR, errMsg)
+        return nil, errMsg
+    end
+    local selfEName = ed.fnFKs[fKeyColumn]
+    if not selfEName or selfEName ~= selfClass.ed.ename then
+        local errMsg = "Entity name '"..eName.."' does not have FK relationship to "..selfClass.ed.ename
+        ngx.log(ngx.ERR, errMsg)
+        return nil, errMsg
+    end
+
+    local vModel, err = selfClass.rightTables[eName], nil
+    if vModel and vModel.leftCols[fKeyColumn] then
+        return vModel
+    end
+
+    ngx.log(ngx.DEBUG, "Adding Right join "..selfClass.ed.ename.." TO "..eName)
+    if not vModel then
+        vModel, err = VModelBuilder.new(nil, eName)
+        if vModel then
+            vModel.toParentCol = fKeyColumn
+            addVModel(selfClass, vModel, -1)
+        end
+    end
+    if not vModel then
+        ngx.log(ngx.ERR, err)
+        return nil, err
+    end
+    vModel:addColumns(...)
+    vModel.leftCols[fKeyColumn] = {eName = selfClass.ed.ename}
+    if onCondition then
+        vModel:addFilter(onCondition, fKeyColumn)
+    end
+    selfClass.rightCols[alias] = {eName, fKeyColumn}
+    return vModel
+end
+local function _update(selfClass, ev, oldVals)
+    ngx.log(ngx.DEBUG, "VModelBuilder '"..selfClass.name.."' UPDATING: \r\n"
+            ..utils.toString(ev, ": ", "\r\n"))
+    if not ev.key then
+        local ok, err = ev:resetKey()
+        if not ok then
+            return ok, err
+        end
+    end
+    local vModel = selfClass:newVModel(true)
+    local conn = eifo.db.conn.redis()
+    conn:connect()
+    local vRecord, err = vModel:loadByKey(ev.values.key, conn, true)
+    conn:disconnect()
+    if not vRecord then
+        local errMsg = "Can not find entity while updating for key '"
+            ..ev.key.."'. Please check maxLevel setting"..err
+        ngx.log(ngx.CRIT, errMsg)
+        return nil, errMsg
+    end
+    local topVModel = vModel:traceBack()
+    topVModel:_notify(oldVals)
+    return topVModel
+end
 
 local function newVModel(selfClass, reversed)
     local instance = setmetatable(utils.newTable(50, 11), {
@@ -591,6 +581,8 @@ local function newVModel(selfClass, reversed)
     instance.leftCols = selfClass.leftCols
     instance.rightCols = selfClass.rightCols
     instance.toParentCol = selfClass.toParentCol
+    instance.onLoaded = selfClass.onLoaded
+    instance.recordCommons = selfClass.recordCommons
 
     instance.keys = {}
     instance.groupBy = {}
@@ -653,7 +645,11 @@ local function newVModel(selfClass, reversed)
     ngx.log(ngx.DEBUG, "Done "..instance.ed.ename)
     return instance
 end
-local __vMClass = utils.newTable(0, 9)
+local function addRecordCommon(selfClass, key, value)
+    selfClass.recordCommons[key] = value
+end
+local __vMClass = utils.newTable(0, 10)
+__vMClass.addRecordCommon = addRecordCommon
 __vMClass.addColumns = addColumns
 __vMClass.addFilter = addFilter
 __vMClass.leftJoin = leftJoin
@@ -664,60 +660,58 @@ __vMClass._attach = utils.observable._attach
 __vMClass._detach = utils.observable._detach
 __vMClass._update = _update
 
-eifo.VModelBuilder = {
-    registry = {},
-    new = function(name, eName, ...)
-        local ed = ED[eName]
-        if not ed then
-            return nil, "Unknown entity name "..eName
-        end
-        local registry = eifo.VModelBuilder.registry
-        if not name then
-            name = eName
-            local i = 1
-            while registry[name] do
-                name = eName.."#"..i
-                i = i + 1
-            end
-        end
-        local builder = {
-            name = name,
-            _observerId = name,
-            maxLevel = 100,
-            ed = ed,
-            columns = {...},
-            leftCols = {},
-            rightCols = {},
-            filters = {},
-        }
-        setmetatable(builder, { __index = __vMClass })
-        builder.leftTables = setmetatable({}, {__index =
-            function(_, key)
-                if builder.parent and builder.posInParent == -1  --right
-                        and key == builder.parent.ed.ename then
-                    return builder.parent
-                end
-                return nil
-            end
-        })
-        builder.rightTables = setmetatable({}, {__index =
-            function(_, key)
-                if builder.parent and builder.posInParent == 1 --left
-                        and key == builder.parent.ed.ename then
-                    return builder.parent
-                end
-                return nil
-            end
-        })
-
-        local ok, err = ed:_attach(builder)
-        if not ok then
-            local errMsg = "Failed to subscribe for entity changes topics: "..(err or "")
-            ngx.log(ngx.ERR, errMsg)
-            return nil, errMsg
-        end
-        registry[name] = builder
-        return builder
+VModelBuilder.new = function(name, eName, ...)
+    local ed = ED[eName]
+    if not ed then
+        return nil, "Unknown entity name "..eName
     end
-}
-return eifo.VModelBuilder
+    local registry = VModelBuilder.registry
+    if not name then
+        name = eName
+        local i = 1
+        while registry[name] do
+            name = eName.."#"..i
+            i = i + 1
+        end
+    end
+    local builder = {
+        name = name,
+        _observerId = name,
+        maxLevel = 100,
+        ed = ed,
+        columns = {...},
+        leftCols = {},
+        rightCols = {},
+        filters = {},
+        recordCommons = {}
+    }
+    setmetatable(builder, { __index = __vMClass })
+    builder.leftTables = setmetatable({}, {__index =
+        function(_, key)
+            if builder.parent and builder.posInParent == -1  --right
+                    and key == builder.parent.ed.ename then
+                return builder.parent
+            end
+            return nil
+        end
+    })
+    builder.rightTables = setmetatable({}, {__index =
+        function(_, key)
+            if builder.parent and builder.posInParent == 1 --left
+                    and key == builder.parent.ed.ename then
+                return builder.parent
+            end
+            return nil
+        end
+    })
+
+    local ok, err = ed:_attach(builder)
+    if not ok then
+        local errMsg = "Failed to subscribe for entity changes topics: "..(err or "")
+        ngx.log(ngx.ERR, errMsg)
+        return nil, errMsg
+    end
+    registry[name] = builder
+    return builder
+end
+return VModelBuilder

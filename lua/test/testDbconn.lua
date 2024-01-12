@@ -3,8 +3,8 @@
 --- Created by tnguyen.
 --- DateTime: 9/20/23 10:32 AM
 ---
-local utils = require "eifo.utils"
-local connFactory = require("eifo.dbconn")
+local utils = eifo.utils
+local connFactory = eifo.db.conn
 local conn = connFactory.redis()
 local ok, err = conn:connect()
 if not ok then

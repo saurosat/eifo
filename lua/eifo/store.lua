@@ -3,21 +3,16 @@
 --- Created by tnguyen.
 --- DateTime: 12/7/23 9:46 AM
 ---
-if not eifo then
-    eifo = {}
-end
-if eifo.store then
-    return eifo.store;
-end
+ngx.log(ngx.DEBUG, "Initilizing Store")
 local req = ngx.req
 local var = ngx.var
-local utils = require("eifo.utils")
+local utils = eifo.utils
 local bit = require("bit")
 
-eifo.store = utils.newTable(0, 9)
-eifo.store.load = function(self)
-    local eds = require("eifo.dao")
-    local conn = require("eifo.dbconn").redis()
+local store = utils.newTable(0, 12)
+store.load = function(self)
+    local eds = eifo.db.ed
+    local conn = eifo.db.conn.redis()
     conn:connect()
     self.ev = eds.ProductStore:get(self.storeId, conn)
     conn:disconnect()
@@ -25,25 +20,35 @@ eifo.store.load = function(self)
         self.secretKey = self.ev.values["secretKey"]
     end
     if not self.secretKey then
-        self.secretKey = var.secretKey
+        self.secretKey = eifo.secretKey
     end
     ngx.log(ngx.INFO, "Secret key ="..self.secretKey)
     self.hashValue = self:hash(self.secretKey)
     self.hashValue = self:hash(self.storeId)
+    self.isLoaded = true
 end
-eifo.store.getSessionToken = function(self)
+store.getSessionToken = function(self)
     return string.format("%08x", self:hash(self:getClientIp()))
 end
-eifo.store.hash = function(self, msg)
+store.getSignature = function(self, message)
+    return string.format("%08x", self:hash(message))
+end
+
+store.hash = function(self, msg)
     local bytes = {string.byte(msg, 1, -1)}
     local h = self.hashValue
+    ngx.log(ngx.DEBUG, "Self hash value = "..h)
+    ngx.log(ngx.DEBUG, "num bytes = "..tostring(#bytes))
     for i = 1, #bytes, 1 do
-        h = h * 31 + bit.band(bytes[i], 0xff)
+        local bits = bytes[i]
+        h = bit.band(bit.lshift(h, 4) + (h*15) + bits, 0x7fffffff)
+        ngx.log(ngx.DEBUG, "bytes = "..string.format("%x", bits).."; hash = "..string.format("%x", h))
     end
-    h = bit.band(h, 0xffffffff)
+    --h = bit.band(h, 0x8fffffff)
+    ngx.log(ngx.DEBUG, "Hash value = "..h)
     return h
 end
-eifo.store.getClientIp = function(self)
+store.getClientIp = function(self)
     local headers = req.get_headers()
     local ip = nil
     for i = 1, #self.ipHeaders, 1 do
@@ -61,20 +66,83 @@ eifo.store.getClientIp = function(self)
     end
     return ip
 end
+store.getProductImageFileNames = function (self, pseudoId)
+    local path = eifo.basePath.."/home/img/"..pseudoId
+    local cmd = "find "..path.." -maxdepth 1"
+    local pfile, err = io.popen(cmd, "r")
+    if not pfile then
+        ngx.log(ngx.DEBUG, err or "Can not open directory")
+        return nil, err
+    end
+    local list = pfile:read('*a')
+    ngx.log(ngx.DEBUG, list)
+    pfile:close()
+    local fileNames, idx = {}, 1
+    for fileName in list:gmatch(pseudoId.."/([^/]+)[\r\n]") do
+        ngx.log(ngx.DEBUG, fileName)
+        fileNames[idx] = fileName
+        idx = idx + 1
+    end
+    return fileNames
+end
+store.getResizedFileName = function (self, originFileName, size)
+    local pseudoId, fileName, ext = originFileName:match("^/([^%.]+)/([^%.]+)%.([^%.]+)$")
+    local signature = store:getSignature(fileName.."."..size)
+    return "/"..pseudoId.."."..signature.."."..size.."."..fileName.."."..ext
+end
+local function getEditedImageName(self, editKey)
+    local resizedFName = self.store:getResizedFileName(self.key, editKey)
+    self[editKey] = resizedFName
+    return resizedFName
+end
+store.newImageObj = function(self, rawFileName)
+    return setmetatable({store = self, key = rawFileName}, {__index = getEditedImageName})
+end
+store.getProductImages = function (self, pseudoId)
+    local fileNames = store:getProductImageFileNames(pseudoId)
+    if not fileNames then
+        return {}
+    end
+    for i = #fileNames, 1, -1 do
+        if fileNames[i]:sub(1, 1) == "." then
+            table.remove(fileNames, i)
+        end
+    end
+    local images = {}
+    local num = #fileNames
+    for i = 1, num, 1 do
+        local nameParts = utils.newArray(4)
+        for part in fileNames[i]:gmatch("([^/%.]+)") do
+            nameParts[#nameParts+1] = part
+        end
+        local numParts = #nameParts
+        local fileName = nameParts[1].."."..nameParts[numParts]
+        assert(fileName, "invalid image fileName: "..fileNames[i])
+        local image = images[fileName]
+        if not image then
+            image = self:newImageObj("/"..pseudoId.."/"..fileName)
+            images[fileName] = image
+        end
+        if numParts == 4 then
+            local signature, size = nameParts[2], nameParts[3]
+            image[size] = "/"..pseudoId.."."..signature.."."..size.."."..fileName
+        end
+    end
+    return images
+end
 
-eifo.store.storeId = ngx.var.storeId
-ngx.log(ngx.INFO, "StoreID = "..eifo.store.storeId)
-eifo.store.hashValue = 0
-eifo.store.ipHeaders = utils.newTable(11, 0)
-eifo.store.ipHeaders[1] = "X-Forwarded-For"
-eifo.store.ipHeaders[2] = "Proxy-Client-IP"
-eifo.store.ipHeaders[3] = "WL-Proxy-Client-IP"
-eifo.store.ipHeaders[4] = "HTTP_X_FORWARDED_FOR"
-eifo.store.ipHeaders[5] = "HTTP_X_FORWARDED"
-eifo.store.ipHeaders[6] = "HTTP_X_CLUSTER_CLIENT_IP"
-eifo.store.ipHeaders[7] = "HTTP_CLIENT_IP"
-eifo.store.ipHeaders[8] = "HTTP_FORWARDED_FOR"
-eifo.store.ipHeaders[9] = "HTTP_FORWARDED"
-eifo.store.ipHeaders[10] = "HTTP_VIA"
-eifo.store.ipHeaders[11] = "REMOTE_ADDR"
-return eifo.store
+store.storeId = eifo.storeId
+store.hashValue = 0
+store.ipHeaders = utils.newTable(11, 0)
+store.ipHeaders[1] = "X-Forwarded-For"
+store.ipHeaders[2] = "Proxy-Client-IP"
+store.ipHeaders[3] = "WL-Proxy-Client-IP"
+store.ipHeaders[4] = "HTTP_X_FORWARDED_FOR"
+store.ipHeaders[5] = "HTTP_X_FORWARDED"
+store.ipHeaders[6] = "HTTP_X_CLUSTER_CLIENT_IP"
+store.ipHeaders[7] = "HTTP_CLIENT_IP"
+store.ipHeaders[8] = "HTTP_FORWARDED_FOR"
+store.ipHeaders[9] = "HTTP_FORWARDED"
+store.ipHeaders[10] = "HTTP_VIA"
+store.ipHeaders[11] = "REMOTE_ADDR"
+return store

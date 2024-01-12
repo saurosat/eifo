@@ -3,8 +3,8 @@
 --- Created by tnguyen.
 --- DateTime: 9/2/23 12:06 PM
 ---
-local utils = require "eifo.utils"
-local eds = require "eifo.dao"
+local utils = eifo.utils
+local eds = eifo.db.ed
 local lockKey = "notifyChanges"
     -- 1. Read Request data:
 local readReqData = require "resty.reqargs"
@@ -35,7 +35,7 @@ if not ev then
     utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Cannot initiate entity value: "..err)
     return
 end
-local connFactory = require("eifo.dbconn")
+local connFactory = eifo.db.conn
 local conn = connFactory.redis()
 local ok, error = conn:connect()
 if ok then
