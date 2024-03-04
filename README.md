@@ -20,8 +20,8 @@ jQuery, KnockoutJS
 
 
 ## Quick Start:
-+ Install Redis Stack Server
-+ Install OpenResty and update $PATH variable to include nginx execution file (nginx is packed inside OpenResty)
++ Install Redis Stack Server: https://redis.io/docs/install/install-stack/
++ Install OpenResty and update $PATH variable to include nginx execution file (nginx is packed inside OpenResty): https://openresty.org/en/installation.html
 + Install ImageMagick and OpenResty module for it:
 For Mac:
 ```
@@ -34,7 +34,11 @@ sudo apt install imagemagick
 opm get tom2nonames/lua-resty-imagick
 ```
 For ubuntu, wont install ImageMagick version 7, must install from source:(https://linuxopsys.com/topics/install-latest-imagemagick-on-ubuntu-20-04), need to include the webp dependency from libwebp-dev. The installed location will be /usr/local/share on Linux or /usr/local/Cellar/imagemagick on MacOS
-
++ Install other openresty modules:
+```
+opm get bungle/lua-resty-reqargs
+opm get bungle/lua-resty-template
+```
 + Open [EIFO ProjectHome]/conf/nginx.conf, check all configs
 + Start Redis Stack Server: redis-stack-server (you can start it as daemon)
 + Start Nginx: nginx -p [EIFO ProjectHome] -c [EIFO ProjectHome]/conf/nginx.conf (Using relative path is ok)
