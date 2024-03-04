@@ -3,6 +3,7 @@
 --- Created by tnguyen.
 --- DateTime: 12/7/23 9:46 AM
 ---
+local ngx = ngx;
 ngx.log(ngx.DEBUG, "Initilizing Store")
 local req = ngx.req
 local var = ngx.var

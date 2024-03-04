@@ -22,21 +22,19 @@ jQuery, KnockoutJS
 ## Quick Start:
 + Install Redis Stack Server
 + Install OpenResty and update $PATH variable to include nginx execution file (nginx is packed inside OpenResty)
-+ Install LuaRock:
-* Download the LuaRocks tarball from https://luarocks.org/releases, extract it
-* cd to extracted folder
-* Run following commands:
++ Install ImageMagick and OpenResty module for it:
+For Mac:
 ```
-// MacOS: LUA_HOME=/usr/local/Cellar/openresty/1.21.4.2_1/luajit 
-// Linux: 
-LUA_HOME=/usr/local/openresty/luajit
-./configure --prefix=$LUA_HOME --with-lua=$LUA_HOME --lua-suffix=jit \
-            --with-lua-include=$LUA_HOME/include/luajit-2.1
-make
-sudo make install
-cd $LUA_HOME/bin
-luarocks install magick
+brew install imagemagick
+opm get tom2nonames/lua-resty-imagick
 ```
+For Linux:
+```
+sudo apt install imagemagick
+opm get tom2nonames/lua-resty-imagick
+```
+For ubuntu, wont install ImageMagick version 7, must install from source:(https://linuxopsys.com/topics/install-latest-imagemagick-on-ubuntu-20-04), need to include the webp dependency from libwebp-dev. The installed location will be /usr/local/share on Linux or /usr/local/Cellar/imagemagick on MacOS
+
 + Open [EIFO ProjectHome]/conf/nginx.conf, check all configs
 + Start Redis Stack Server: redis-stack-server (you can start it as daemon)
 + Start Nginx: nginx -p [EIFO ProjectHome] -c [EIFO ProjectHome]/conf/nginx.conf (Using relative path is ok)
