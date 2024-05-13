@@ -121,8 +121,8 @@ end
 local _mt = utils.newTable(0, 6)
 _mt.load = load
 _mt.setParams = setParams
-_mt.addEntity = addEntity
-_mt.addPreloadEntity = addPreloadEntity
+-- _mt.addEntity = addEntity
+-- _mt.addPreloadEntity = addPreloadEntity
 --_mt._attach = utils.observable._attach
 --_mt._detach = utils.observable._detach
 --_mt._notify = utils.observable._notify

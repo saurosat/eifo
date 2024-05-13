@@ -23,7 +23,7 @@ store.load = function(self)
     if not self.secretKey then
         self.secretKey = eifo.secretKey
     end
-    ngx.log(ngx.INFO, "Secret key ="..self.secretKey)
+    -- ngx.log(ngx.INFO, "Secret key ="..self.secretKey)
     self.hashValue = self:hash(self.secretKey)
     self.hashValue = self:hash(self.storeId)
     self.isLoaded = true
@@ -38,15 +38,15 @@ end
 store.hash = function(self, msg)
     local bytes = {string.byte(msg, 1, -1)}
     local h = self.hashValue
-    ngx.log(ngx.DEBUG, "Self hash value = "..h)
-    ngx.log(ngx.DEBUG, "num bytes = "..tostring(#bytes))
+    -- ngx.log(ngx.DEBUG, "Self hash value = "..h)
+    -- ngx.log(ngx.DEBUG, "num bytes = "..tostring(#bytes))
     for i = 1, #bytes, 1 do
         local bits = bytes[i]
         h = bit.band(bit.lshift(h, 4) + (h*15) + bits, 0x7fffffff)
-        ngx.log(ngx.DEBUG, "bytes = "..string.format("%x", bits).."; hash = "..string.format("%x", h))
+        -- ngx.log(ngx.DEBUG, "bytes = "..string.format("%x", bits).."; hash = "..string.format("%x", h))
     end
     --h = bit.band(h, 0x8fffffff)
-    ngx.log(ngx.DEBUG, "Hash value = "..h)
+    -- ngx.log(ngx.DEBUG, "Hash value = "..h)
     return h
 end
 store.getClientIp = function(self)
@@ -76,11 +76,11 @@ store.getProductImageFileNames = function (self, pseudoId)
         return nil, err
     end
     local list = pfile:read('*a')
-    ngx.log(ngx.DEBUG, list)
+    -- ngx.log(ngx.DEBUG, list)
     pfile:close()
     local fileNames, idx = {}, 1
     for fileName in list:gmatch(pseudoId.."/([^/]+)[\r\n]") do
-        ngx.log(ngx.DEBUG, fileName)
+        -- ngx.log(ngx.DEBUG, fileName)
         fileNames[idx] = fileName
         idx = idx + 1
     end

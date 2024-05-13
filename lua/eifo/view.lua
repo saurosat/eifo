@@ -9,8 +9,21 @@ local eds = eifo.dao
 local workPermit = eifo.workPermit
 local ngx = ngx
 
-local viewClass = utils.newTable(0,8)
+local viewClass = setmetatable(utils.newTable(0,8), {__index = function (self, key)
+        return nil;
+    end})
+viewClass.getConn = function (...)
+    local conn, err = eifo.db.conn.redis()
+    if not conn then
+        return nil, err
+    end
+    conn:connect()
+    return conn
+end
 viewClass.getOutFile = function(self, key)
+    if self.componentPath then
+        return self.location.."/"..self.name..".html"
+    end
     if not key or key == "index" then
         return self.location.."/index.html", "index"
     end
@@ -20,7 +33,10 @@ viewClass.getOutFile = function(self, key)
 end
 
 viewClass._update = function(self, vModel, _)
-    local conn = eifo.db.conn.redis()
+    local conn, err = eifo.db.conn.redis()
+    if not conn then
+        return nil, err
+    end
     conn:connect()
     local numRecords = #vModel
     for i = 1, numRecords, 1 do
@@ -31,12 +47,7 @@ viewClass._update = function(self, vModel, _)
     end
     conn:disconnect()
 end
-viewClass.getUri = function(self, id)
-    if not id then
-        return self.outLocationUri
-    end
-    return self.outLocationUri.."/"..id
-end
+
 viewClass.process = function(self, params)
     ngx.log(ngx.INFO, (self.name or "root")..": "..table.concat(params, ","))
     local numParams = (params and #params) or 0
@@ -53,62 +64,66 @@ viewClass.process = function(self, params)
     -- IF there is a sub-view has matched name-pattern, pass control to it:
     local subView = self.children[params[1]]
     if subView then
-        ngx.log(ngx.DEBUG, "calling sub view "..subView.name)
+        ngx.log(ngx.INFO, "Dispatch to subview "..subView.name)
         table.remove(params, 1)
         return subView:process(params)
     end
 
-    local modelBuilder = self.modelBuilder
-    local ed = modelBuilder.ed;
-    local key = ed:generateKey(params)
-    ngx.log(ngx.DEBUG, "Param key = "..key)
-    local outPathFile, outFile = self:getOutFile(key)
-    --local wp = workPermit.get(outPathFile, conn) -- disable for testing. TODO: re-enable
-    local wp = {} -- For testing purpose only (delete file manually)
-    if wp ~= nil then
-        local model, err = self:getModel(key)
-        if not model then
-            ngx.log(ngx.DEBUG, "Entity not found whil searching with params "..table.concat(params)..": "..(err or "(No error info)"))
-            utils.responseError(ngx.HTTP_NOT_FOUND, "Page not found ")
-            return
+    local conn = self:getConn()
+    if not conn then
+        utils.responseError(500, "Got some problems! We will fix it soon. Please come back later")
+        return
+    end
+    conn:connect()
+    local model, key, err = self:getModel(params, conn)
+    if not model then
+        if not self.modelBuilder then
+            err = "Non-container view without ModelBuilder attached: Name = "..(self.name or "nil")..". Params ="..table.concat(params)
+        else
+            err = "Entity not found whil searching with params "..table.concat(params)..": "..(err or "(No error info)")
         end
-        local html = self:getHtml(model)
+        ngx.log(ngx.INFO, err)
+        utils.responseError(ngx.HTTP_NOT_FOUND, "Page not found ")
+        conn.disconnect()
+        return
+    end
+    local html = self:getHtml(model)
+    ngx.header["Content-type"] = "text/html; charset=utf-8"
+    ngx.say(html)
+
+    local outPathFile, evKey = self:getOutFile(key)
+    --local wp = {} -- For testing purpose only (delete file manually)
+    local wp = workPermit.get(outPathFile, conn) 
+    conn:disconnect();
+    if wp ~= nil then -- write html to a static file 
         local f = assert(io.open(outPathFile, "w"))
         f:write(html)
         f:close()
-    else-- other process or thread is generating the same file:
-        ngx.sleep(0.5) -- waiting for static content being generated
     end
-    -- ngx.say(html)
-    -- if the static is not ready, another round trip will continue:
-    ngx.log(ngx.INFO, "redirecting to: /home"..self.outLocationUri.."/"..outFile..".html")
-    ngx.exec("/home"..self.outLocationUri.."/"..outFile..".html")
 end
-viewClass.getModel = function(self, key)
-    if not self.modelBuilder then
-        return nil, nil
-    end
-    local vModel = self.modelBuilder:newVModel()
+viewClass.getModel = function(self, params, conn)
+    local vModel, key
 
-    local conn = eifo.db.conn.redis()
-    conn:connect()
-    local vRecord, err = vModel:loadByKey(key, conn)
-    conn:disconnect()
-    if not vRecord then
-        err = err or "No records found. Please check maxLevel setting"
-        return nil, err
-    end
-
-    ngx.log(ngx.DEBUG, "eifo.view.getModel({"..key.."})\r\n")
-    for i = 1, #vModel, 1 do
-        ngx.log(ngx.DEBUG, utils.toString(vModel[i], ":", "\r\n"))
-        for k, _ in pairs(vModel.rightCols) do
-            ngx.log(ngx.DEBUG, "Column '"..k.."'\r\n")
-            ngx.log(ngx.DEBUG, utils.toString(vModel[i][k], ":", "\r\n"))
+    if self.modelBuilder then
+        key = self.modelBuilder.ed:generateKey(params)
+        vModel = self.modelBuilder:newVModel(false, self.ignoredTables or false)
+        local vRecord, err = vModel:loadByKey(key, conn)
+        if not vRecord then
+            err = err or "No records found. Please check maxLevel setting"
+            return nil, nil, err
         end
     end
-
-    return vModel
+    if self.componentPath then
+        if not vModel then
+            vModel = {}
+        end
+        local path = self.componentPath
+        for i = 1, #params, 1 do
+            path = path.."/"..params[i]
+        end
+        vModel.pathParam = path
+    end
+    return vModel, key
 end
 viewClass.getHtml = function(self, model)
     model = model or {}
@@ -116,8 +131,8 @@ viewClass.getHtml = function(self, model)
     ngx.log(ngx.DEBUG, "\r\n\r\n Start rendering: \r\n")
     local template = require("resty.template").new()
     local fn = template.compile(self.template, "no-cache")
-    ngx.log(ngx.DEBUG, utils.toString(fn))
-    --ngx.log(ngx.NOTICE, utils.toString(v.compile, ":", "\n"))
+    --ngx.log(ngx.DEBUG, utils.toString(fn))
+    -- ngx.log(ngx.NOTICE, utils.toString(v.compile, ":", "\n"))
     ngx.log(ngx.DEBUG, "\r\n\r\n End rendering: \r\n")
 
     return fn({model = model})
@@ -126,18 +141,18 @@ viewClass.addSub = function(self, view)
     self.children[view.name] = view
     return self
 end
-viewClass.createSub = function(self, name, template, modelBuilder, minParams)
-    local sub = viewClass.new(name, template, modelBuilder, minParams, self)
+viewClass.createSub = function(self, name, template, modelBuilder, minParams, componentPath)
+    local sub = viewClass.new(name, template, modelBuilder, minParams, self, componentPath)
     self:addSub(sub)
     return sub
 end
-viewClass.new = function(name, template, viewModelClass, minParams, parent)
-    local outLocationUri = (parent and parent.outLocationUri) or ""
+viewClass.new = function(name, template, viewModelClass, minParams, parent, componentPath)
     local basePath = eifo.basePath
     local location = (parent and parent.location) or basePath.."/home" -- TODO: make this configurable
-    if name and string.len(name) > 0 and name ~= "index" then
-        outLocationUri = outLocationUri.."/"..name
-        location = location.."/"..name
+    local path = location.."/"..(name or "")
+
+    if (not componentPath) and name and name:len() > 0 and name ~= "index" then
+        location = path
         local ok, _, code = os.rename(location, location) -- check if location exist
         if not ok and code ~= 13 then
             os.execute("mkdir "..location) --TODO: make the mkdir command configurable
@@ -146,15 +161,16 @@ viewClass.new = function(name, template, viewModelClass, minParams, parent)
 
     local viewObj = {
         name = name,
-        outLocationUri = outLocationUri,
-        _observerId = outLocationUri,
         location = location,
+        componentPath = componentPath,
         modelBuilder = viewModelClass,
+        _observerId = path,
         template = template,
         minParams = minParams,
         parent = parent,
         children = {}
-    }
+    }    
+
     setmetatable(viewObj, {__index = viewClass})
     -- subscribe to get notifications from EDs:
     if viewModelClass then

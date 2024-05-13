@@ -1,4 +1,4 @@
-var BO_URL = "https://gleecy.io:8080";
+var BO_URL = "";
 var GeoService = {
     getCountries: function() { return axios.get(BO_URL + "/rest/s1/pop/geos").then(function (response) { return response.data; }); },
     getRegions: function(geoId) { return axios.get(BO_URL + "/rest/s1/pop/geos/" + geoId + "/regions").then(function (response) { return response.data; }); },

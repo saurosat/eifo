@@ -34,44 +34,44 @@ end
 ]]
 
 -- Connect to Redis:
-local redisAgent = require "resty.redis"
-redisAgent.register_module_prefix("ft") -- Register module FT to create/search indexes
-local redis = redisAgent:new()
-redis:set_timeouts(1000, 1000, 1000) -- 1 sec
-local ok, errConn = redis:connect("127.0.0.1", 6379)
-if not ok then
-    responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "failed to connect to Redis: " .. errConn)
-    return
-end
+-- local redisAgent = require "resty.redis"
+-- redisAgent.register_module_prefix("ft") -- Register module FT to create/search indexes
+-- local redis = redisAgent:new()
+-- redis:set_timeouts(1000, 1000, 1000) -- 1 sec
+-- local ok, errConn = redis:connect("127.0.0.1", 6379)
+-- if not ok then
+--     responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "failed to connect to Redis: " .. errConn)
+--     return
+-- end
 
--- Check/create indexes:
+-- -- Check/create indexes:
 
-local cjson = require "cjson"
-local indexes = redis:ft():_list()
-local cExist, pExist, promoExist
-for k, v in pairs(indexes) do
-    if(v == "idx:c") then
-        ngx.say("Catalog index is already exists")
-        cExist = true
-    elseif v == "idx:p" then
-        ngx.say("Product index is already exists")
-        pExist = true
-    elseif v == "idx:promo" then
-        ngx.say("Promotion index is already exists")
-        promoExist = true
-    end
-end
-if not cExist then
-    assert(redis:ft():create("idx:c", "ON", "HASH", "SCHEMA", "categoryName", "TEXT", "WEIGHT", "1.0", "description", "TEXT", "WEIGHT", "0.8"))
-end
-if not pExist then
-    idxInfo = assert(redis:ft():create("idx:p", "ON", "HASH", "SCHEMA", "productName", "TEXT", "WEIGHT", "1.2", "description", "TEXT", "WEIGHT", "1.0"))
-end
-if not promoExist then
-    idxInfo = assert(redis:ft():create("idx:promo", "ON", "HASH", "SCHEMA", "itemDescription", "TEXT", "WEIGHT", "1.0"))
-end
+-- local cjson = require "cjson"
+-- local indexes = redis:ft():_list()
+-- local cExist, pExist, promoExist
+-- for k, v in pairs(indexes) do
+--     if(v == "idx:c") then
+--         ngx.say("Catalog index is already exists")
+--         cExist = true
+--     elseif v == "idx:p" then
+--         ngx.say("Product index is already exists")
+--         pExist = true
+--     elseif v == "idx:promo" then
+--         ngx.say("Promotion index is already exists")
+--         promoExist = true
+--     end
+-- end
+-- if not cExist then
+--     assert(redis:ft():create("idx:c", "ON", "HASH", "SCHEMA", "categoryName", "TEXT", "WEIGHT", "1.0", "description", "TEXT", "WEIGHT", "0.8"))
+-- end
+-- if not pExist then
+--     idxInfo = assert(redis:ft():create("idx:p", "ON", "HASH", "SCHEMA", "productName", "TEXT", "WEIGHT", "1.2", "description", "TEXT", "WEIGHT", "1.0"))
+-- end
+-- if not promoExist then
+--     idxInfo = assert(redis:ft():create("idx:promo", "ON", "HASH", "SCHEMA", "itemDescription", "TEXT", "WEIGHT", "1.0"))
+-- end
 
-ngx.status = ngx.HTTP_OK
-ngx.eof()
-redis:set_keepalive(10000, 50) -- maintain 50 connections in connection pool, with 10s timeout
+-- ngx.status = ngx.HTTP_OK
+-- ngx.eof()
+-- redis:set_keepalive(10000, 50) -- maintain 50 connections in connection pool, with 10s timeout
 

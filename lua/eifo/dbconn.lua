@@ -79,6 +79,7 @@ rwmt.hset = function(self, key, hashValue, autocommit)
     local newVersion = 1
     --ngx.log(ngx.DEBUG, "OldVals: \n"..utils.toString(oldVals, ": ", "\n"))
     local newFields = {} -- keeps fields that is currently empty
+    local delFields = {} -- Fields to be deleted
     if not oldVals or utils.isTableEmpty(oldVals) then
         hashValue["version"] = 1
         newVals = hashValue
@@ -92,7 +93,11 @@ rwmt.hset = function(self, key, hashValue, autocommit)
                 newFields[#newFields] = k
                 newVals[k] = v
             elseif oldVals[k] ~= v then -- different:
-                newVals[k] = v
+                if v == "_NA_" then
+                    delFields[#delFields+1] = k
+                else
+                    newVals[k] = v
+                end
             else -- if equal :
                 oldVals[k] = nil -- remove from oldVals
                 table.remove(fields, i) -- remove from fields
@@ -108,7 +113,14 @@ rwmt.hset = function(self, key, hashValue, autocommit)
         return {} -- no differences found. Ignored update
     end
     --ngx.log(ngx.DEBUG, "hmset params: "..utils.toString(newVals, ": ", "\n"))
-    local ok, err = self.connection:hmset(key, newVals)
+    local ok, err
+    if #delFields > 0 then
+        ok, err = self.connection:hdel(key, table.unpack(delFields))
+        if not ok then
+            return nil, err
+        end
+    end
+    ok, err = self.connection:hmset(key, newVals)
     if not ok then
         return nil, err
     end
@@ -179,7 +191,7 @@ rwmt.hdel = function(self, key, fields, autocommit)
         num = self.connection:hdel(key, table.unpack(fields))
     end
     if num == 0 then
-        err = "Can not delete key '"..key.."'"
+        local err = "Can not delete key '"..key.."'"
         if fields then err = err..", fields: "..table.concat(fields, ",") end
         return nil, err
     end
@@ -189,10 +201,13 @@ rwmt.hdel = function(self, key, fields, autocommit)
     return oldVals, nil, curvals
 end
 rwmt.sadd = function(self, key, item, autocommit)
-    local num, error = self.connection:sadd(key, item)
+    if not item then
+        return 0
+    end
+    local num, err = self.connection:sadd(key, item)
     if not num then
-        ngx.log(ngx.ERR, "SADD Key="..(key or "NIL")..", item="..(item or "NIL")..error)
-        return 0, error
+        ngx.log(ngx.ERR, "SADD Key="..(key or "NIL")..", item="..(item or "NIL").." "..(err or ""))
+        return 0, err
     end
     if not autocommit and  num > 0 then
         self._rollback:push({f = rwmt.sremove, params = {self, key, item, true}})
@@ -202,7 +217,7 @@ end
 rwmt.sremove = function(self, key, item, autocommit)
     local num, err = self.connection:srem(key, item)
     if not num then
-        ngx.log(ngx.ERR, error)
+        ngx.log(ngx.INFO, "Delete failed, key="..key..", keyItem="..(item or "NIL").." is not found. "..(err or ""))
         return 0, err
     end
     if not autocommit and num > 0 then
@@ -237,7 +252,12 @@ local connFactory = {
         port = port or eifo.db.port or ngx.var.dbport
         poolsize = poolsize or eifo.db.poolsize or ngx.var.poolsize
         timeout = timeout or eifo.db.timeout or ngx.var.timeout
-        local connection = redisAgent:new()
+        local connection, err = redisAgent:new()
+        if not connection then
+            local errMsg = "Can not initialized DB connection "
+            ngx.log(ngx.CRIT, errMsg + ": " + (err or "Unknown error"))
+            return nil, errMsg
+        end
         connection:set_timeouts(timeout)
         local dbconn = {
             _host = host,

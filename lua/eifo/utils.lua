@@ -5,13 +5,13 @@
 ---
 ngx.log(ngx.INFO, "Initilizing utils...")
 local newTable, newArray, newHashTbl
-if table.new then
-    newTable = table.new
+if table["new"] then
+    newTable = table["new"]
     newArray = function (size)
-        return table.new(size, 0)
+        return table["new"](size, 0)
     end
     newHashTbl = function (size)
-        return table.new(0, size)
+        return table["new"](0, size)
     end
 else
     newTable = function (...) return {} end
@@ -57,6 +57,53 @@ local function sourceCode(f)
     --end
     --return table.concat(text,"\n")
 end
+local function toJson(v, refs)
+    local kvSep = ":"
+    if v == nil then return "null" end
+    if not v then return "false" end
+    local vType = type(v)
+    -- prevent circular invokes:
+    if not refs or #refs == 0 then
+        refs = {v}
+    else
+        local refsLen = #refs
+        for i = 1, refsLen, 1 do
+            if v == refs[i] then
+                return "null"
+            end
+        end
+        refs[refsLen + 1] = v
+    end
+    local str
+    if vType == "table" then
+        if #v > 0 then
+            str = "["
+            str = str..toJson(v[1], refs)
+            for i = 2, #v, 1 do
+                str = str..", "..toJson(v[i], refs)
+            end
+            str = str.."]"
+        else
+            str = "{"
+            for key, val in pairs(v) do
+                str = str.."'"..key.."'"..kvSep..toJson(val, refs)..","
+            end
+            if(string.len(str) > 4) then
+                str = str.."}"
+            else
+                str = "null"
+            end
+        end
+    end
+    refs[#refs] = nil
+    return  str
+            or (vType == "string" and ("'"..v.."'"))
+            or (vType == "number" and _G.tostring(v))
+            or (vType == "boolean" and "true")
+            or (vType == "function" and sourceCode(v))
+            or "null"
+end
+
 local function toString(v, kvSep, newLine, refs)
     if v == nil then return "nil" end
     if not v then return "false" end
@@ -101,6 +148,15 @@ local function toString(v, kvSep, newLine, refs)
             or vType
 end
 
+local function timeFromDbStr(dbDateTimeStr)
+    ngx.log(ngx.DEBUG, dbDateTimeStr)
+    local pattern = "(%d+)-(%d+)-(%d+) (%d+):(%d+):?(%d*)"
+    local year, month, day, hour, minute, second = dbDateTimeStr:match(pattern)
+    local dateObj = {year = year, month = month, day = day, hour = hour, minute = minute, second = second}
+    ngx.log(ngx.DEBUG, toJson(dateObj))
+    return os.time(dateObj)
+end
+
 local attach = function(self, observer)
     if not observer._observerId then
         local errMsg = [[Observer have no observerId]]
@@ -126,13 +182,13 @@ local detach = function(self, observerId)
     return self
 end
 local notify = function(self, oldVals)
+    if not self._observers or isTableEmpty(self._observers) then
+        -- ngx.log(ngx.ALERT, "Notify without any receivers: "..toString(self, ": ", "\r\n"))
+        return false, "No receivers"
+    end
     ngx.log(ngx.DEBUG, "Sender: "..toString(self, ": ", "\r\n"))
     ngx.log(ngx.DEBUG, "oldVals: "..toString(oldVals, ": ", "\r\n"))
 
-    if not self._observers or isTableEmpty(self._observers) then
-        ngx.log(ngx.ALERT, "Notify without any receivers: "..toString(self, ": ", "\r\n"))
-        return false, "No receivers"
-    end
     for _, v in pairs(self._observers) do
         ngx.log(ngx.DEBUG, "Receiver: "..toString(v, ": ", "\r\n"))
         v:_update(self, oldVals)
@@ -221,7 +277,7 @@ end
 local responseError = function(httpStatus, errMessage)
     ngx.status = httpStatus
     ngx.say("{'message':'"..errMessage.."'}")
-    ngx.eof()
+    --ngx.eof()
 end
 local popKey = function(tbl, key)
     local val = tbl[key]
@@ -297,7 +353,7 @@ local getPathParam = function(uri, api)
     end
     return splitStr(paramStr, "/")
 end
-local utils = newTable(0, 26)
+local utils = newTable(0, 27)
 utils.sourceCode = sourceCode
 utils.splitStr = splitStr
 utils.getPathParam = getPathParam
@@ -315,7 +371,9 @@ utils.mergeRef = mergeRef
 utils.listToHash = listToHash
 utils.tbllen = tbllen
 utils.toString = toString
+utils.toJson = toJson
 utils.addIfNotExist = addIfNotExist
+utils.timeFromDbStr = timeFromDbStr
 utils.printTable = function(tbl)
     if not tbl then
         ngx.say("Table is null")
@@ -330,11 +388,51 @@ utils.lifo = lifo
 
 utils.responseError = responseError
 
+utils.cloneHashTbl = function(hTable, resultTable, refs)
+    for key, value in pairs(hTable) do
+        resultTable[key] = utils.clone(value, refs)
+    end
+end
+utils.cloneArray = function(arr, resultArray, refs)
+    local len = #arr
+    local newTbl = {}
+    for i = 1, len, 1 do
+        resultArray[i] = utils.clone(arr[i], refs)
+    end
+    return newTbl
+end
+utils.clone = function(v, refs)
+    if not v or type(v) ~= "table" then
+        return v
+    end
+
+    local newTbl = {}
+    -- prevent circular invokes:
+    if not refs or #refs == 0 then
+        refs = {v}
+    else
+        for i = #refs, 1, -1 do
+            if v == refs[i] then
+                return v
+            end
+        end
+        refs[#refs + 1] = v
+    end
+    if #v > 0 then
+        newTbl = utils.cloneArray(v, refs)
+    end
+    utils.cloneHashTbl(v, newTbl, refs)
+    setmetatable(newTbl, getmetatable(v))
+    refs[#refs] = nil
+    return newTbl
+end
 utils.ArraySet = {
-    add = function(self, record)
-        for idx = #self, 1, -1 do
-            if self[idx] == record or self[idx].key == record.key then
-                return idx
+    add = function(self, record, noCheck)
+        if not noCheck then
+            for idx = #self, 1, -1 do
+                if self[idx] == record or self[idx].key == record.key then
+                    return idx
+                end
             end
         end
         local idx = #self + 1
@@ -351,6 +449,9 @@ utils.ArraySet = {
         return nil
     end,
     intersect = function(self, otherSet)
+        if not otherSet then
+            return self
+        end
         local arraySet = utils.ArraySet.new()
         for i = #otherSet, 1, -1 do
             if self:index(otherSet[i]) then
@@ -359,8 +460,8 @@ utils.ArraySet = {
         end
         return arraySet
     end,
-    new = function (self)
-        local arraySet = (self and #self > 0 and {table.unpack(self)}) or {}
+    new = function (array)
+        local arraySet = array or {}
         setmetatable(arraySet, {__index = utils.ArraySet})
         return arraySet
     end

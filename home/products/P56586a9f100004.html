@@ -1,33 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Gleecy Shopping">
-    <meta name="keywords" content="clothes, cross border, VN, Vietnam, Viet Nam, US, America">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>gleecy</title>
+    <meta name="description" content="Free open source Tailwind CSS Store template">
+    <meta name="keywords" content="tailwind,tailwindcss,tailwind css,css,starter template,free template,store template, shop layout, minimal, monochrome, minimalistic, theme, nordic">
 
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Work+Sans:200,400&display=swap">
     <link rel="stylesheet" href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css"/>
-    <link rel="stylesheet" href="/base.css" >
+    <link href="/dist/output.css" rel="stylesheet">
 
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.3.0/knockout-min.js"></script>
-    <title>Gleecy</title>
+    <link href="https://fonts.googleapis.com/css?family=Work+Sans:200,400&display=swap" rel="stylesheet">
+
+    <style>
+
+         .work-sans {
+            font-family: 'Work Sans', sans-serif;
+        }
+
+        #menu-toggle:checked + #menu {
+            display: block;
+        }
+
+        .hover\:grow {
+            transition: all 0.3s;
+            transform: scale(1);
+        }
+
+        .hover\:grow:hover {
+            transform: scale(1.02);
+        }
+
+        .carousel-open:checked + .carousel-item {
+            position: static;
+            opacity: 100;
+        }
+
+        .carousel-item {
+            -webkit-transition: opacity 0.6s ease-out;
+            transition: opacity 0.6s ease-out;
+        }
+
+        #carousel-1:checked ~ .control-1,
+        #carousel-2:checked ~ .control-2,
+        #carousel-3:checked ~ .control-3 {
+            display: block;
+        }
+        .carousel-indicators {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            position: absolute;
+            bottom: 2%;
+            left: 0;
+            right: 0;
+            text-align: center;
+            z-index: 10;
+        }
+
+        #carousel-1:checked ~ .control-1 ~ .carousel-indicators li:nth-child(1) .carousel-bullet,
+        #carousel-2:checked ~ .control-2 ~ .carousel-indicators li:nth-child(2) .carousel-bullet,
+        #carousel-3:checked ~ .control-3 ~ .carousel-indicators li:nth-child(3) .carousel-bullet {
+            color: #000;
+            /*Set to match the Tailwind colour you want the active one to be */
+        }
+
+      /* Hide the scrollbar for this container */
+      .sm:overflow-x-auto::-webkit-scrollbar {
+          display: none;
+      }
+
+    </style>
+    <!-- scrollbar style for horizontal menu scroll -->
+    <style>
+      .hide-scroll-bar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      .hide-scroll-bar::-webkit-scrollbar {
+        display: none;
+      }
+    </style>
+    <script>
+        var userProfileUITemplateStr = document.getElementById("userProfileUI").getInnerHTML;
+        var ele = __.render(userProfileUIStr);
+        //render it. and add it to DOM here
+    </script>
 </head>
+
 <body>
+<script id="cartInfoTemplate" type="text/html" >
+</script>
+<script id="cartInfoUI" type="text/html" >
+    <!--
+    client html templates here
+    -->
+</script>
+
 <!-- MAIN HEADER, FIRST ROW -- logo, search, nav menu, sub nav menu -->
 <section>
     <nav class="bg-gray-800">
         <!-- DESKTOP & MOBILE SECTION THAT NEED TO BE INCLUDE IN THE VERY FIRST ROW -->
         <!-- ############################################ -->
         <div class="mx-auto max-w-7xl px-2 sm:px-4">
+
             <div class="relative flex h-16 items-center justify-between">
                 <div class="flex items-center px-2 ">
                     <!-- logo section -->
                     <div class="flex-shrink-0">
+                        <!--  <img class="h-8 w-auto" src="https://tailwindui.com/img/logos/mark.svg?color=indigo&shade=500" alt="Your Company"> -->
                         <a href="#" class="block rounded-md px-3 py-2 text-base font-medium text-white hover:bg-gray-700 hover:text-orange">GLEECY</a>
                     </div>
                 </div>
+
                 <!-- search-section -->
                 <div class="flex flex-1 hidden lg:block md:block">
                     <div class="w-full max-w-md">
@@ -40,7 +128,9 @@
                             </div>
                             <input id="search" name="search" class="block w-full  rounded-md border-0 bg-gray-700 py-1.5 pl-12 pr-3 text-gray-300 placeholder:text-gray-400 focus:bg-white focus:text-gray-900 focus:ring-0 sm:text-sm sm:leading-6" placeholder="Search" type="search">
                         </div>
+
                     </div>
+
                 </div>
 
                 <!-- language, signin, orders, returns section -->
@@ -104,7 +194,7 @@
                             </div>
                             <!-- orders-menu -->
                             <div class="hidden lg:ml-6 lg:block">
-                                <button type="button" class="flex items-center gap-x-1 text-sm font-semibold leading-6 text-gray-300 hover:bg-gray-700 hover:text-white p-1 rounded-md text-white" aria-expanded="false" onmouseover="show('orders-menu')" onmouseout="hide('orders-menu')" >
+                                <button type="button" class="flex items-center gap-x-1 text-sm font-semibold leading-6 text-gray-300 hover:bg-gray-700 hover:text-white p-1 rounded-md text-white" aria-expanded="false" onmouseover="show('orders-menu')" onmouseout="hide('orders-menu')">
                                     Orders
                                     <svg class="h-5 w-5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                         <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
@@ -112,7 +202,7 @@
                                 </button>
                                 <div class="absolute z-10 mt-2 w-32 py-0 max-w-md overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-gray-900/5 hidden" id="orders-menu" onmouseover="show('orders-menu')" onmouseout="hide('orders-menu')" >
                                     <div class="relative rounded-lg p-4 hover:bg-gray-100 hover:rounded-none">
-                                        <a href="#" class="block text-sm font-semibold leading-6 text-gray-900" onclick="toggle('CartPopupContainer')">
+                                        <a href="#" class="block text-sm font-semibold leading-6 text-gray-900">
                                             Orders
                                             <span class="absolute inset-0"></span>
                                         </a>
@@ -230,6 +320,10 @@
                     </button>
 
                 </div>
+
+
+
+
             </div>
 
             <!-- Hamburger menu dropdown location -->
@@ -252,7 +346,7 @@
                     </button>
                 </div>
                 <div class="relative rounded-md p-4 hover:bg-gray-100 hover:rounded-none" onclick="toggleOrdersMobile()">
-                    <button type="button" class="flex items-center gap-x-1 text-sm font-semibold leading-6 text-black" aria-expanded="false">
+                    <button type="button" class="flex items-center gap-x-1 text-sm font-semibold leading-6 text-black" aria-expanded="false" >
                         Orders
                         <svg class="h-5 w-5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
@@ -310,7 +404,7 @@
             <!-- second dropdown w/ hammenu -->
             <div class="absolute z-10 mt-2 w-32 py-0 max-w-md overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-gray-900/5 right-32 top-48 hidden" id="orders-menu-dropdown-mobile" onmouseleave="toggle('orders-menu-dropdown-mobile')" >
                 <div class="relative rounded-lg p-4 hover:bg-gray-100 hover:rounded-none">
-                    <a href="#" class="block text-sm font-semibold leading-6 text-gray-900" onclick="toggle('CartPopupContainer')">
+                    <a href="#" class="block text-sm font-semibold leading-6 text-gray-900">
                         Orders
                         <span class="absolute inset-0"></span>
                     </a>
@@ -552,8 +646,7 @@
     </nav>
 </section>
 
-<div id="CartPopupContainer" class="hidden z-50 p-8 fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 ">
-
+<div id="CartPopupContainer" >
     <!--
     Place holder to keep DOM for Cart UI
     This element is invisible and empty at the beginning.
@@ -562,163 +655,7 @@
     DOM element, then put DOM element to this element
     2. Else: make it popup (position is absolute, pinned by top right corner, and display is block)
     -->
-    <!-- <script type="text/html" id="username-template">
-        <h3 data-bind="text: userName"></h3>
-        <p>Credits: <span data-bind='text: fullName'></span></p>
-    </script>
-
-    var userInfo = LoginService.login(); -->
-    <!-- <div data-bind="template: {name: 'username-template', data: userInfo}"></div> -->
-
-
-    <div class="bg-white w-1/2 overflow-y-auto  rounded-2xl relative p-6">
-        <button id="closePopup" class="absolute top-4 right-4 p-2" onclick="toggle('CartPopupContainer')">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-6 w-6 text-gray-700">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-        </button>
-        <div class="mx-auto max-w-4xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
-            <h1 class="text-3xl font-bold tracking-tight text-gray-900">Shopping Cart</h1>
-
-            <form class="mt-12">
-                <h2 class="sr-only">Items in your shopping cart</h2>
-                <div id="itemSummary" class="mt-10 sm:ml-32 sm:pl-6 mx-auto max-w-4xl">
-                    <h2 class="text-xl font-bold mb-4">Product Items</h2>
-                    <div data-bind="foreach: productItemList" class="mb-4">
-                        <div class="flex items-center justify-between border-b border-gray-200 py-4">
-                            <div class="flex-shrink-0">
-                                <!-- Replace 'imageUrl' with the actual property from your ViewModel -->
-                                <img data-bind="attr: { src: imageUrl, alt: itemDescription }" class="h-24 w-24 rounded-lg object-cover object-center sm:h-32 sm:w-32">
-                            </div>
-
-                            <div class="relative ml-4 flex flex-1 flex-col justify-between sm:ml-6">
-                                <div class="flex justify-between sm:grid sm:grid-cols-2">
-                                    <div class="pr-6">
-                                        <h3 class="text-sm">
-                                            <!-- Replace 'itemDescription' with the actual property from your ViewModel -->
-                                            <a href="#" class="font-medium text-gray-700 hover:text-gray-800" data-bind="text: itemDescription"></a>
-                                        </h3>
-                                        <p class="mt-1 text-sm text-gray-500">test//</p>
-                                    </div>
-
-                                    <p class="text-right text-sm font-medium text-gray-900">
-                                        <!-- Replace 'unitAmount' with the actual property from your ViewModel -->
-                                        $<span data-bind="text: unitAmount.toFixed(2)"></span>
-                                    </p>
-                                </div>
-
-                                <div class="mt-4 flex items-center sm:absolute sm:left-1/2 sm:top-0 sm:mt-0 sm:block">
-                                    <label for="quantity-0" class="sr-only">Quantity, Nomad Tumbler</label>
-                                    <select id="quantity-0" name="quantity-0" class="block max-w-full rounded-md border border-gray-300 py-1.5 text-left text-base font-medium leading-5 text-gray-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm">
-                                        <option value="1">1</option>
-                                        <option value="2">2</option>
-                                        <option value="3">3</option>
-                                        <option value="4">4</option>
-                                        <option value="5">5</option>
-                                        <option value="6">6</option>
-                                        <option value="7">7</option>
-                                        <option value="8">8</option>
-                                    </select>
-
-                                    <button type="button" class="ml-4 text-sm font-medium text-indigo-600 hover:text-indigo-500 sm:ml-0 sm:mt-3">
-                                        <span>Remove</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <p class="mt-4 flex space-x-2 text-sm text-gray-700">
-                                <svg class="h-5 w-5 flex-shrink-0 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                                </svg>
-                                <span>In stock</span>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-
-                <!-- Order summary -->
-                <div id="orderSummary" class="mt-10 sm:ml-32 sm:pl-6">
-                    <div class="rounded-lg bg-gray-50 px-4 py-6 sm:p-6 lg:p-8">
-                        <h2 class="sr-only">Order summary</h2>
-
-                        <div class="flow-root">
-                            <dl class="-my-4 divide-y divide-gray-200 text-sm">
-                                <!-- ko foreach: orderSummaryItems -->
-                                <div class="flex items-center justify-between py-4">
-                                    <dt class="text-gray-600" data-bind="text: label"></dt>
-                                    <dd class="font-medium text-gray-900" data-bind="text: value"></dd>
-                                    <!-- <dt class="text-gray-600">Subtotal</dt>
-                                    <dd class="font-medium text-gray-900">$99.00</dd>
-                                  </div>
-                                  <div class="flex items-center justify-between py-4">
-                                    <dt class="text-gray-600">Shipping</dt>
-                                    <dd class="font-medium text-gray-900">$5.00</dd>
-                                  </div>
-                                  <div class="flex items-center justify-between py-4">
-                                    <dt class="text-gray-600">Tax</dt>
-                                    <dd class="font-medium text-gray-900">$8.32</dd>
-                                  </div>
-                                  <div class="flex items-center justify-between py-4">
-                                    <dt class="text-base font-medium text-gray-900">Order total</dt>
-                                    <dd class="text-base font-medium text-gray-900">$112.32</dd> -->
-                                </div>
-                                <!-- /ko -->
-
-                            </dl>
-                        </div>
-                    </div>
-                    <div class="mt-10">
-                        <button type="submit" class="w-full rounded-md border border-transparent bg-indigo-600 px-4 py-3 text-base font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-50">Checkout</button>
-                    </div>
-
-                    <div class="mt-6 text-center text-sm text-gray-500">
-                        <p>
-                            or
-                            <a href="#" class="font-medium text-indigo-600 hover:text-indigo-500">
-                                Continue Shopping
-                                <span aria-hidden="true"> &rarr;</span>
-                            </a>
-                        </p>
-                    </div>
-                </div>
-            </form>
-        </div>
-
-    </div>
 </div>
-
-<!-- shopping cart get request -->
-<!-- <script>
-    function CartViewModel() {
-      var self = this;
-      self.cartItems = ko.observableArray([]);
-      self.fetchDataAndPopulateCart = async function () {
-        try {
-          const response = await fetch('http://gleecy.io:8080/rest/s1/pop/login');
-
-          if (response.ok) {
-            const data = await response.json();
-
-            // Update the cartItems array with the fetched data
-            self.cartItems(data);
-
-          } else {
-            console.error('Request failed with status:', response.status);
-          }
-        } catch (error) {
-          console.error('Error fetching data:', error);
-        }
-    };
-
-      self.fetchDataAndPopulateCart();
-    }
-
-    // Apply bindings at the end of the body
-    var cartViewModel = new CartViewModel();
-    ko.applyBindings(cartViewModel);
-</script> -->
-
 <!-- NAV2 MENU SECTION, SECOND ROW Mobile SubNav Bar (Apparel, Telemedicine, etc) -->
 <section>
     <nav class="bg-white mx-auto flex max-w-7xl items-center justify-between lg:p-6 md:p-6 max-w-7xl px-2 sm:px-4 lg:px-8 md:px-8" aria-label="Global">
@@ -917,271 +854,128 @@
     </div>
 </section>
 
-<section>
-    <div class="bg-white">
-        <div class="mx-auto max-w-2xl px-4 py-16 sm:px-6 sm:py-10 lg:max-w-7xl lg:px-8">
-            <h2 class="text-2xl font-bold tracking-tight text-gray-900">Apparel</h2>
-
-            <div class="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-x-8">
-                <a href="/products/DEMO_001" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_001.5e980998.280x280.Red.jpeg" alt="For Demo1" class="h-full w-full object-cover object-center group-hover:opacity-75">
+<section class="py-20 overflow-hidden bg-white font-poppins dark:bg-gray-800">
+    <div class="max-w-6xl px-4 py-4 mx-auto lg:py-8 md:px-6">
+        <div class="flex flex-wrap -mx-4">
+            <div class="w-full max-h-screen px-4 md:w-2/3">
+    <div class="overflow-hidden h-4/5 grid gap-2 grid-rows-5 grid-cols-6 md:auto-rows-auto">
+      <nav class="flex md:block grid-cols-subgrid col-span-6 md:col-span-1 md:grid-rows-subgrid md:row-span-5 overflow-x-scroll md:overflow-x-hidden overflow-y-hidden md:overflow-y-scroll row-start-5 md:row-start-auto ">
+          
+        <a href="#DEMO_002_BlueXL.jpeg" class="flex mr-2 min-w-12 min-h-12 md:min-w-full md:mb-2">
+          <img class="object-cover saturate-0 transition-all hover:saturate-100 hover:scale-105" src="/DEMO_002.0708742c.100x100.DEMO_002_BlueXL.jpeg" alt="Image not available" />
+        </a>
+      </nav>
+      <div class="block grid-rows-subgrid row-span-4 md:row-span-5 md:grid-cols-subgrid col-span-6 md:col-span-5 overflow-y-hidden overflow-x-scroll">
+          
+        <img class="h-full mb-2 object-cover" id="DEMO_002_BlueXL.jpeg" src="/DEMO_002/DEMO_002_BlueXL.jpeg" alt="Image not available" />
+      </div>
+    </div>
+</div>
+            <div class="w-full px-4 md:w-1/3 ">
+                <div class="lg:pl-2">
+                    <div class="pb-6 mb-8 border-b border-gray-200 dark:border-gray-700">
+                        <span class="text-lg font-medium text-rose-500 dark:text-rose-200">New</span>
+                        <h2 class="max-w-xl mt-2 mb-6 text-xl font-bold dark:text-gray-300 md:text-4xl">
+                            Long-Sleeved T-shirt
+                        </h2>
+                        <p class="max-w-md mb-8 text-gray-700 dark:text-gray-400">
+                            Lorem ispum dor amet Lorem ispum dor amet Lorem ispum dor amet Lorem ispum dor amet
+                            Lorem ispum dor amet Lorem ispum dor amet Lorem ispum dor amet Lorem ispum dor amet
+                        </p>
+                        <p class="inline-block text-2xl font-semibold text-gray-700 dark:text-gray-400 ">
+                            <span>$994.00</span>
+                            <span
+                                class="text-base font-normal text-gray-500 line-through dark:text-gray-400">$1500.00</span>
+                        </p>
                     </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st One</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_003" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_003.32307a2c.280x280.DEMO_003.webp" alt="For Demo3" class="h-full w-full object-cover object-center group-hover:opacity-75">
+                    <div class="mb-8">
+                        <h2 class="mb-2 text-xl font-bold dark:text-gray-400">
+                            Color</h2>
+                        <div class="flex flex-wrap -mb-2">
+                            <button
+                                class="p-1 mb-2 mr-2 border border-transparent rounded-full hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-400 ">
+                                <div class="w-6 h-6 bg-red-600 rounded-full"></div>
+                            </button>
+                            <button
+                                class="p-1 mb-2 mr-2 border border-transparent rounded-full hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-400">
+                                <div class="w-6 h-6 bg-green-600 rounded-full"></div>
+                            </button>
+                            <button
+                                class="p-1 mb-2 border border-transparent rounded-full hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-400">
+                                <div class="w-6 h-6 bg-yellow-500 rounded-full"></div>
+                            </button>
+                            <button
+                                class="p-1 mb-2 border border-transparent rounded-full hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-400">
+                                <div class="w-6 h-6 rounded-full bg-sky-400"></div>
+                            </button>
+                        </div>
                     </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Three</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_002" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_002.168bbf89.280x280.cute_whiteblue_L.jpeg" alt="For Demo2" class="h-full w-full object-cover object-center group-hover:opacity-75">
+                    <div class="pb-6 mb-8 border-b border-gray-300 dark:border-gray-700">
+                        <h2 class="mb-2 text-xl font-bold dark:text-gray-400">
+                            Size</h2>
+                        <div class="flex flex-wrap -mb-2">
+                            <button
+                                class="py-1 mb-2 mr-1 border w-11 hover:border-blue-400 dark:border-gray-400 hover:text-blue-600 dark:hover:border-gray-300 dark:text-gray-400">XL
+                            </button>
+                            <button
+                                class="py-1 mb-2 mr-1 border w-11 hover:border-blue-400 hover:text-blue-600 dark:border-gray-400 dark:hover:border-gray-300 dark:text-gray-400">S
+                            </button>
+                            <button
+                                class="py-1 mb-2 mr-1 border w-11 hover:border-blue-400 hover:text-blue-600 dark:border-gray-400 dark:hover:border-gray-300 dark:text-gray-400">M
+                            </button>
+                            <button
+                                class="py-1 mb-2 mr-1 border w-11 hover:border-blue-400 hover:text-blue-600 dark:border-gray-400 dark:hover:border-gray-300 dark:text-gray-400">XS
+                            </button>
+                        </div>
                     </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Two</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_004" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_004.4674e92d.280x280.DEMO_004.webp" alt="For Demo4" class="h-full w-full object-cover object-center group-hover:opacity-75">
+                    <div class="flex flex-wrap items-center ">
+                        <div class="mb-4 mr-4 lg:mb-0">
+                            <div class="w-28">
+                                <div class="relative flex flex-row w-full h-10 bg-transparent rounded-lg">
+                                    <button
+                                        class="w-20 h-full text-gray-600 bg-gray-100 border-r rounded-l outline-none cursor-pointer dark:border-gray-700 dark:hover:bg-gray-700 dark:text-gray-400 hover:text-gray-700 dark:bg-gray-900 hover:bg-gray-300">
+                                        <span class="m-auto text-2xl font-thin">-</span>
+                                    </button>
+                                    <input type="number"
+                                        class="flex items-center w-full font-semibold text-center text-gray-700 placeholder-gray-700 bg-gray-100 outline-none dark:text-gray-400 dark:placeholder-gray-400 dark:bg-gray-900 focus:outline-none text-md hover:text-black"
+                                        placeholder="1">
+                                    <button
+                                        class="w-20 h-full text-gray-600 bg-gray-100 border-l rounded-r outline-none cursor-pointer dark:border-gray-700 dark:hover:bg-gray-700 dark:text-gray-400 dark:bg-gray-900 hover:text-gray-700 hover:bg-gray-300">
+                                        <span class="m-auto text-2xl font-thin">+</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-4 mr-4 lg:mb-0">
+                            <button
+                                class="w-full h-10 p-2 mr-4 bg-blue-500 dark:text-gray-200 text-gray-50 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500">
+                                Buy Now</button>
+                        </div>
+                        <div class="mb-4 mr-4 lg:mb-0">
+                            <button
+                                class="flex items-center justify-center w-full h-10 p-2 text-gray-700 border border-gray-300 lg:w-11 hover:text-gray-50 dark:text-gray-200 dark:border-blue-600 hover:bg-blue-600 hover:border-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 dark:hover:border-blue-500 dark:hover:text-gray-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                                    class="bi bi-cart" viewBox="0 0 16 16">
+                                    <path
+                                        d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5zM3.102 4l1.313 7h8.17l1.313-7H3.102zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="mb-4 lg:mb-0">
+                            <button
+                                class="flex items-center justify-center w-full h-10 p-2 text-gray-700 border border-gray-300 lg:w-11 hover:text-gray-50 dark:text-gray-200 dark:border-blue-600 hover:bg-blue-600 hover:border-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 dark:hover:border-blue-500 dark:hover:text-gray-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                                    class=" bi bi-heart" viewBox="0 0 16 16">
+                                    <path
+                                        d="m8 2.748-.717-.737C5.6.281 2.514.878 1.4 3.053c-.523 1.023-.641 2.5.314 4.385.92 1.815 2.834 3.989 6.286 6.357 3.452-2.368 5.365-4.542 6.286-6.357.955-1.886.838-3.362.314-4.385C13.486.878 10.4.28 8.717 2.01L8 2.748zM8 15C-7.333 4.868 3.279-3.04 7.824 1.143c.06.055.119.112.176.171a3.12 3.12 0 0 1 .176-.17C12.72-3.042 23.333 4.867 8 15z" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Four</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_005" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_005.5ab9582e.280x280.DEMO_005.webp" alt="For Demo5" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Five</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_006" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_006.6efdc72f.280x280.DEMO_006.webp" alt="For Demo6" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Six</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_007" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_007.03423630.280x280.DEMO_007.webp" alt="For Demo7" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Seven</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_008" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_008.1786a531.280x280.DEMO_008.webp" alt="For Demo8" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Eight</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_009" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_009.561c370e.280x280.tim_ca_paltal_bdb_425_5065_-boduimacnhacaocap-.jpeg" alt="For Demo9" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Nine</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_010" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_010.772bb017.280x280.promo1.jpeg" alt="For Demo10" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Ten</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-
-                <!-- More products... -->
-            </div>
-        </div>
-        <div class="mx-auto max-w-2xl px-4 py-16 sm:px-6 sm:py-10 lg:max-w-7xl lg:px-8">
-            <h2 class="text-2xl font-bold tracking-tight text-gray-900">Vitamins</h2>
-
-            <div class="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-x-8">
-                <a href="/products/DEMO_009" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_009.561c370e.280x280.tim_ca_paltal_bdb_425_5065_-boduimacnhacaocap-.jpeg" alt="For Demo9" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Nine</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_012" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_012.1fb48e19.280x280.promo3.jpeg" alt="For Demo12" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Twelve</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_015" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_015.183aff35.280x280.pull_girl_white_M.jpeg" alt="For Demo15" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Fifteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_018" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_018.3314bc72.280x280.skirt_white_M.jpeg" alt="For Demo18" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Eighteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_013" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_013.6d6e0615.280x280.2pieces_white_L.jpeg" alt="For Demo13" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Thirteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_016" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_016.6934e75b.280x280.bangdo_dom.jpeg" alt="For Demo16" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Sixteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_019" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_019.1f1a3840.280x280.hat_white_S.jpeg" alt="For Demo19" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Nineteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_010" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_010.772bb017.280x280.promo1.jpeg" alt="For Demo10" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Ten</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_012" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_012.1fb48e19.280x280.promo3.jpeg" alt="For Demo12" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Twelve</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_015" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_015.183aff35.280x280.pull_girl_white_M.jpeg" alt="For Demo15" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Fifteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_018" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_018.3314bc72.280x280.skirt_white_M.jpeg" alt="For Demo18" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Eighteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_013" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_013.6d6e0615.280x280.2pieces_white_L.jpeg" alt="For Demo13" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Thirteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_016" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_016.6934e75b.280x280.bangdo_dom.jpeg" alt="For Demo16" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Sixteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_019" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_019.1f1a3840.280x280.hat_white_S.jpeg" alt="For Demo19" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Nineteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_014" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_014.292b3f4f.280x280.aodai_classic_white_L.jpeg" alt="For Demo14" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Fourteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_017" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_017.2cba6181.280x280.sexy_redyellow_XL.jpeg" alt="For Demo17" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Seventeen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_011" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_011.0b701f18.280x280.promo2.jpeg" alt="For Demo11" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Eleven</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_012" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_012.1fb48e19.280x280.promo3.jpeg" alt="For Demo12" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Twelve</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_015" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_015.183aff35.280x280.pull_girl_white_M.jpeg" alt="For Demo15" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Fifteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_018" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_018.3314bc72.280x280.skirt_white_M.jpeg" alt="For Demo18" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Eighteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_013" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_013.6d6e0615.280x280.2pieces_white_L.jpeg" alt="For Demo13" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Thirteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_016" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_016.6934e75b.280x280.bangdo_dom.jpeg" alt="For Demo16" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Sixteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_019" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_019.1f1a3840.280x280.hat_white_S.jpeg" alt="For Demo19" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Nineteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_014" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_014.292b3f4f.280x280.aodai_classic_white_L.jpeg" alt="For Demo14" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Fourteen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-                <a href="/products/DEMO_017" class="group">
-                    <div class="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200 xl:aspect-h-8 xl:aspect-w-7">
-                        <img src="/DEMO_017.2cba6181.280x280.sexy_redyellow_XL.jpeg" alt="For Demo17" class="h-full w-full object-cover object-center group-hover:opacity-75">
-                    </div>
-                    <h3 class="mt-4 text-sm text-gray-700">Demo again 1st Seventeen</h3>
-                    <p class="mt-1 text-lg font-medium text-gray-900">Call</p>
-                </a>
-
-                <!-- More products... -->
+                </div>
             </div>
         </div>
     </div>
-
 </section>
 
 <!-- FOOTER1 -->
@@ -1241,7 +1035,148 @@
         </div>
     </footer>
 </section>
-<script src="/token"></script>
-<script type="text/javascript" src="/base.js"></script>
+
 </body>
+
+<!-- JAVASCRIPT -->
+<script>
+
+    var timer; //for the show/hide timeout code
+    var currentlyOpenMenu = null;
+
+    const subLan = document.getElementById('language-menu-dropdown-mobile');
+    const subSignin = document.getElementById('sign-in-menu-dropdown-mobile');
+    const subOrders = document.getElementById('orders-menu-dropdown-mobile');
+    const subReturns = document.getElementById('returns-menu-dropdown-mobile');
+
+//hamburger button and dropdown menu code
+/////////////////////////////////////////
+
+    document.addEventListener('click', function (event) {
+        const hamburgMenu = document.getElementById('hamburg-menu');
+        const mobileMenu = document.getElementById('language-menu-mobile');
+        const hamburgSpan = document.getElementById('hamburg-span');
+        const mobileMenuSub1 = document.getElementById('language-menu-dropdown-mobile-span1');
+        const mobileMenuSub12 = document.getElementById('language-menu-dropdown-mobile-span2');
+        const mobileMenuSub13 = document.getElementById('language-menu-dropdown-mobile-span3');
+        const mobileMenuSub2 = document.getElementById('sign-in-menu-dropdown-mobile-span');
+        const mobileMenuSub3 = document.getElementById('orders-menu-dropdown-mobile-span');
+        const mobileMenuSub4 = document.getElementById('returns-menu-dropdown-mobile-span');
+
+        //closes the menu if anything but the menu and its submenus is clicked. any new submenus and ids need to be added here so a click on them wont trigger the whole thing dissapearing
+        if (!mobileMenu.contains(event.target) && event.target !== hamburgMenu && event.target !== hamburgSpan && event.target !== mobileMenuSub1 && event.target !== mobileMenuSub2 && event.target !== mobileMenuSub3 && event.target !== mobileMenuSub4 && event.target !== mobileMenuSub12 && event.target !== mobileMenuSub13) {
+            mobileMenu.classList.add('hidden');
+            subLan.classList.add('hidden');
+            subSignin.classList.add('hidden');
+            subOrders.classList.add('hidden');
+            subReturns.classList.add('hidden');
+
+
+        }
+        //close all other submenus when opening another submenu
+
+        if (!mobileMenu.contains(event.target) && event.target !== hamburgMenu && event.target !== hamburgSpan) {
+            mobileMenuSub1.classList.add('hidden');
+            mobileMenuSub2.classList.add('hidden');
+            mobileMenuSub3.classList.add('hidden');
+            mobileMenuSub4.classList.add('hidden');
+
+        }
+
+
+    });
+
+    function toggleMobileMenu() {
+        const mobileMenu = document.getElementById('language-menu-mobile');
+        mobileMenu.classList.toggle('hidden');
+        if(subLan.classList.contains('hidden')){subLan.classList.add('hidden');}
+        else{subLan.classList.toggle('hidden');}
+
+        if(subSignin.classList.contains('hidden')){subSignin.classList.add('hidden');}
+        else{subSignin.classList.toggle('hidden');}
+
+        if(subOrders.classList.contains('hidden')){subOrders.classList.add('hidden');}
+        else{subOrders.classList.toggle('hidden');}
+
+        if(subReturns.classList.contains('hidden')){subReturns.classList.add('hidden');}
+        else{subReturns.classList.toggle('hidden');}
+        // subSignin.classList.toggle('hidden');
+        // subOrders.classList.toggle('hidden');
+        // subReturns.classList.toggle('hidden');
+        mobileMenuVisible = !mobileMenuVisible;
+    }
+
+
+
+    function show(elementID) {//from   w w w . j  a  va2  s.  c o  m
+
+        var show_menu = document.getElementById(elementID);
+        if (currentlyOpenMenu != null)
+            document.getElementById(currentlyOpenMenu).style.display ="none"; //close the previous menu, if exists
+        currentlyOpenMenu = elementID;
+        show_menu.style.display="block";
+        clearTimeout(timer);
+
+
+    }
+
+    function hide(elementID) {
+        var hide_menu = document.getElementById(elementID);
+        timer = setTimeout(function() {
+            hide_menu.style.display = "none";
+        }, 70);
+    }
+
+    function toggle(elementID) {
+        var element = document.getElementById(elementID);
+        if (element.classList.contains("hidden")) {
+            element.classList.remove("hidden");
+        } else {
+            element.classList.add("hidden");
+        }
+    }
+
+    function close(elementID) {
+        var element = document.getElementById(elementID);
+        element.classList.add("hidden");
+    }
+
+    function toggleLangMobile(){
+        toggle('language-menu-dropdown-mobile');
+        close('sign-in-menu-dropdown-mobile');
+        close('orders-menu-dropdown-mobile');
+        close('returns-menu-dropdown-mobile');
+    }
+
+    function toggleSignInMobile(){
+        close('language-menu-dropdown-mobile');
+        toggle('sign-in-menu-dropdown-mobile');
+        close('orders-menu-dropdown-mobile');
+        close('returns-menu-dropdown-mobile');
+    }
+
+    function toggleOrdersMobile(){
+        close('language-menu-dropdown-mobile');
+        close('sign-in-menu-dropdown-mobile');
+        toggle('orders-menu-dropdown-mobile');
+        close('returns-menu-dropdown-mobile');
+    }
+
+    function toggleReturnsMobile(){
+        close('language-menu-dropdown-mobile');
+        close('sign-in-menu-dropdown-mobile');
+        close('orders-menu-dropdown-mobile');
+        toggle('returns-menu-dropdown-mobile');
+    }
+    function checkScreenSize() {
+        if (window.innerWidth >= 1024) { // Tailwind CSS breakpoints: md and lg
+            close('language-menu-mobile');
+        }
+    }
+
+
+    window.addEventListener('resize', checkScreenSize);
+
+</script>
+
 </html>

@@ -151,6 +151,7 @@ for k = 1, #data do
         for j = 1, #eVals do
             urlStr = urlStr.."&".. eCols[j].."="..escape(eVals[j])
         end
+---@diagnostic disable-next-line: missing-fields
         local res = submit(urlStr, { method = ngx.HTTP_GET })
         ngx.say("<li>"..urlStr..": "..res.body) --((res.status == ngx.HTTP_OK and "OK") or res.body).."</li>")
     end

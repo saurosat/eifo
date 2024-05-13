@@ -14,14 +14,14 @@ if not reqData or utils.isTableEmpty(reqData) then
     utils.responseError(ngx.HTTP_NO_CONTENT, "Request data is missing")
     return
 end
-ngx.log(ngx.DEBUG, utils.toString(reqData, ": ", "\n"))
+-- ngx.log(ngx.DEBUG, utils.toString(reqData, ": ", "\n"))
 
 local entityName = utils.popKey(reqData, "entityName")
 if not entityName then
     utils.responseError(ngx.HTTP_BAD_REQUEST, "Entity Name is expected with key 'entityName'")
     return
 end
-ngx.say("Entity Name: "..entityName)
+--ngx.say("Entity Name: "..entityName)
 
 local ed = eds[entityName]
 if not ed then
@@ -31,29 +31,42 @@ end
 --ngx.say("Entity prefix: "..ed.prefix)
 --utils.printTable(reqData)
 local ev, err = ed:new(reqData)
+
 if not ev then
-    utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Cannot initiate entity value: "..err)
+    ngx.log(ngx.INFO, "Cannot initiate entity value: "..(err or ""))
+    utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Cannot initiate entity value: "..(err or ""))
     return
 end
+ngx.log(ngx.DEBUG, "ev is "..(ev and utils.toJson(ev) or "NIL"))
+
+ngx.status = ngx.HTTP_OK
+ngx.say("OK!")
+ngx.eof() -- release http connection
+
 local connFactory = eifo.db.conn
-local conn = connFactory.redis()
+local conn, errMsg = connFactory.redis()
+if not conn then
+    ngx.log(ngx.CRIT, "Failed to get DB connection "..errMsg)
+    return
+end
 local ok, error = conn:connect()
 if ok then
     conn:incr(lockKey)
-    if utils.popKey(reqData, "delete") then
-        ok, error = ev:delete(conn)
-    else
-        ok, error = ev:save(conn)
-    end
+    ok, error = ev:getNotified(conn)
 end
 local num = conn:decr(lockKey)
 conn:disconnect()
-if not ok then
-    utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, error)
-else
-    ngx.say("OK!")
-    --ngx.status = ngx.HTTP_OK
-end
+ngx.log(ngx.DEBUG, utils.toString(reqData, ": ", "\n")..": "..((ok and "Updated successfully") or error or "Updated failed"))
+-- if not ok then
+--     utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, error)
+-- else
+--     ngx.status = ngx.HTTP_OK
+--     ngx.say("OK!")
+--     ngx.eof()
+-- end
+
+
+
 --if num == 0 and ngx.var.autoRegen then
 --    ngx.location.capture("/generateStaticResource")
 --end

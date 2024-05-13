@@ -33,14 +33,18 @@ function eifo.vrecord:getKey(key)
         local rightInfo = vModel.rightCols[key]
         if rightInfo then
             local rightVModel = vModel.rightTables[rightInfo[1]] --> rightInfo[1] is table name
-            local groupBy = rightVModel.groupBy[rightInfo[2]] --> rightInfo[2] is joined column name
-            return groupBy and groupBy[self.key] or nil
+            if rightVModel then
+                local groupBy = rightVModel.groupBy[rightInfo[2]] --> rightInfo[2] is joined column name
+                return groupBy and groupBy[self.key] or nil
+                end
         end
-        local fkKey = string.match(key, "Obj$") and key:sub(1, -4) or key.."Id"
+        local fkKey = (string.match(key, "Obj$") and key:sub(1, -4)) or key.."Id"
         local leftInfo = vModel.leftCols[fkKey]
         if leftInfo then
             local leftVModel = self.vModel.leftTables[leftInfo.eName]
-            return leftVModel and leftVModel.keys[self[fkKey]] or nil
+            if leftVModel then
+                return leftVModel.keys[self[fkKey]]
+            end
         end
     end
     return meta[key]
@@ -57,26 +61,63 @@ function eifo.vrecord:newInstance(vModel, recordData)
     local _mt = self:new({ vModel = vModel or {} })
     return _mt:new(recordData or {})
 end
+function eifo.vrecord:toJson()
+    return utils.toJson(self)
+end
 eifo.vrecord.ProductCategory = eifo.vrecord:new()
-function eifo.vrecord.ProductCategory:getAllProducts ()
+function eifo.vrecord.ProductCategory:getAllProducts (catType, directOnly)
+    --ngx.log(ngx.DEBUG, "catType = "..(catType or "nil"))
+    catType = catType or nil
     local products = {}
     local catMems = self.catMems
+    if not catMems then
+        --ngx.log(ngx.DEBUG, "selv.ignoredTables = "..(self.ignoredTables or "nil"))
+        return products
+    end
     for i = 1, #catMems, 1 do 
         products[#products + 1] = catMems[i].product
     end
-    local childCats = self.children
-    if childCats then
-        for i = 1, #childCats, 1 do 
-            local childCat = childCats[i].productCategory
-            local childCatPrds = childCat:getAllProducts()
-            for j = 1, #childCatPrds, 1 do 
-                products[#products + 1] = childCatPrds[j]
+    if not directOnly then
+        local childCats = self.children
+        if childCats then
+            for i = 1, #childCats, 1 do 
+                local childCat = childCats[i].productCategory
+                -- ngx.log(ngx.DEBUG, "childCat.productCategoryTypeEnumId = "..(childCat.productCategoryTypeEnumId or "nil"))
+                if catType == nil or childCat.productCategoryTypeEnumId == catType then
+                    local childCatPrds = childCat:getAllProducts(catType)
+                    for j = 1, #childCatPrds, 1 do 
+                        products[#products + 1] = childCatPrds[j]
+                    end
+                end
             end
         end
     end
-    ngx.log(ngx.DEBUG, "cat:getAllProducts, catMems: "..(catMems and tostring(#catMems) or "nil")..", childCats: "..(childCats and tostring(#childCats) or "nil"))
+    --ngx.log(ngx.DEBUG, "Numbers of products: " ..#products.."cat:getAllProducts, catMems: "..(catMems and tostring(#catMems) or "nil")..", childCats: "..(childCats and tostring(#childCats) or "nil"))
     return products
 end
+local function convertTreeToString(self, pattern, propNames, categoryType)
+    if categoryType and self.productCategoryTypeEnumId ~= categoryType then
+        return ''
+    end
+    local values = utils.newArray(#propNames)
+    for i = 1, #propNames, 1 do
+        values[i] = self[propNames[i]]
+    end
+    print(table.unpack(values))
+    local str = string.format(pattern, table.unpack(values))
+    local childs = self.children
+    if not childs then
+       return str 
+    end
+    for i = 1, #childs, 1 do
+        if childs[i] then
+            local subCat = self.vModel.keys[childs[i].productCategoryId]
+            str = str..convertTreeToString(subCat, pattern, propNames, categoryType)
+        end
+    end
+    return str;
+end
+eifo.vrecord.ProductCategory.convertTreeToString = convertTreeToString;
 
 eifo.vrecord.Product = eifo.vrecord:new()
 local function getEditedFileName(image, editKey)
@@ -141,9 +182,9 @@ function eifo.vrecord.Product:onLoaded()
         end
         for i = #applFeatures, 1, -1 do
             local applFeature = applFeatures[i]
-            local feature = applFeature.feature
+            local feature = applFeature.productFeature
             local applType = applFeature.applTypeEnumId
-            local featureType = applFeature.feature.productFeatureTypeEnumId
+            local featureType = feature.productFeatureTypeEnumId
             if applType == "Selectable" then
                 addToArrayField(features, featureType, feature)
             else

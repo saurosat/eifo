@@ -9,6 +9,11 @@ local PREFIX_SEP = ":"
 
 local utils = eifo.utils
 local ngx = ngx
+
+local function getRelationKey(childED, fkColumn, parentKey)
+    return childED.prefix..PREFIX_SEP..fkColumn..PREFIX_SEP..parentKey
+end
+
 local ed
 local _EV = {}
 _EV.__index = {
@@ -78,7 +83,7 @@ _EV.__index = {
     end,
     getChildrenIds = function(self, entityName, fkColumnName, conn)
         local cEd = ed[entityName]
-        local relKey = self:relKey(cEd, fkColumnName)
+        local relKey = getRelationKey(ed[entityName], fkColumnName, self.values.key)
         return conn:sgetall(relKey)
     end,
     getChildren = function(self, entityName, fkColumnName, conn, childrenIds)
@@ -115,23 +120,25 @@ _EV.__index = {
         return memVals
     end,
     removeOldParents = function(self, oldVals, conn)
-        local parents = self.ed:getFKEntities(oldVals)
-        if not parents or #parents == 0 then
-            return 0
-        end
+        local key = oldVals.key or self.values.key
+        ngx.log(ngx.DEBUG, "removeOldParents key="..(key or "NIL"))
         local count = 0
-        for k, v in pairs(parents) do
-            count = count + 1
-            local relKey = v:relKey(self.ed, k)
-            local num = conn:sremove(relKey, v.key)
-            if not num then
-                return nil, "Cannot remove foreign key "..v.key
+        local fkFields = self.ed.fnFKs
+        for colName, _ in pairs(fkFields) do
+            if oldVals[colName] ~= nil then
+                local relKey = getRelationKey(self.ed, colName, oldVals[colName])
+                local num = conn:sremove(relKey, key)
+                if not num then
+                    local msg = "Cannot remove foreign key "..key
+                    ngx.log(ngx.ERR, msg)
+                    return nil, msg
+                end
+                count = count + 1
             end
         end
         return count
     end,
     updateParents = function(self, oldVals, conn)
-        local curFks = self.values
         if self.values.version > 1 then -- UPDATE
             local numFkChanges, err = self:removeOldParents(oldVals, conn)
             if not numFkChanges then
@@ -140,35 +147,25 @@ _EV.__index = {
             if numFkChanges == 0 then
                 return 0
             end
-            curFks = utils.newTable(0, numFkChanges)
-            local fnFks = self.ed.fnFKs
-            for i = 1, #fnFks, 1 do
-                if oldVals[fnFks[i]] ~= nil then
-                    curFks[fnFks[i]] = self.values[fnFks[i]]
-                end
-            end
         end
-
-        local fkEntities = self.ed:getFKEntities(curFks)
-        if not fkEntities or utils.isTableEmpty(fkEntities) then
-            return 0
-        end
+        local fkFields = self.ed.fnFKs
         local count = 0
-        for k, v in pairs(fkEntities) do
-            count = count + 1
-            local relKey = v:relKey(self.ed, k)
-            local num = conn:sadd(relKey, self.values.key)
-    
-            if not num then
-                return nil, "Cannot add foreign key '"..self.values.key.."' into"..relKey
+        for colName, _ in pairs(fkFields) do
+            if oldVals[colName] ~= nil then
+                local relKey = getRelationKey(self.ed, colName, self.values[colName])
+                count = count + 1
+                local num = conn:sadd(relKey, self.values.key)        
+                if not num then
+                    local errMsg = "Cannot add foreign key '"..self.values.key.."' into"..relKey
+                    ngx.log(ngx.ERR, errMsg)
+                    return nil, errMsg
+                end
             end
         end
         return count
     end,
-    relKey = function (self, childED, fkColumn)
-        return childED.prefix..PREFIX_SEP..fkColumn..PREFIX_SEP..self.values["key"]
-    end,
     _fail = function(conn, errMsg, nocommit)
+        ngx.log(ngx.ERR, errMsg)
         if not nocommit then
             conn:rollback()
         end
@@ -204,11 +201,11 @@ _EV.__index = {
             error(errMsg, ngx.ERR)
             return nil, errMsg
         end
-        local fields = utils.keys(self.values)
-        if #fields == 0 then
-            return nil, "Cannot delete: input hash table is empty"
-        end
-        return self:deleteFields(conn, fields, nocommit)
+        -- local fields = utils.keys(self.values)
+        -- if #fields == 0 then
+        --     return nil, "Cannot delete: input hash table is empty"
+        -- end
+        return self:deleteFields(conn, nil, nocommit)
     end,
     deleteFields = function(self, conn, fields, nocommit)
         if self.ed.evs then
@@ -216,25 +213,65 @@ _EV.__index = {
             error(errMsg, ngx.ERR)
             return nil, errMsg
         end
+        if fields and #fields > 0 then
+            local fnIds = self.ed.fnIds
+            for i = 1, #fields, 1 do
+                for j = 1, #fnIds, 1 do
+                    if fields[i] == fnIds[j] then
+                        local errMsg = "Can not delete ID field: "..fnIds[j]
+                        ngx.log(ngx.ERR, errMsg)
+                        return nil, errMsg
+                    end
+                end
+            end
+        end
         local oldVals, err, curVals = conn:hdel(self.values["key"], fields)
         if not oldVals then return nil, err end
-        for k, _ in pairs(oldVals) do
-            self.values[k] = nil
+        if fields then
+            for k, _ in pairs(oldVals) do
+                self.values[k] = nil
+            end
+            for k, v in pairs(curVals) do
+                self.values[k] = v
+            end
+            self:resetFKeys(oldVals)
+            self:resetKey(oldVals)
+        else
+            ngx.log(ngx.DEBUG, self.values["key"].." is firing notifications")
+            self:_notify(oldVals) --> notify before delete all keys
+            --conn:sremove(self.ed.prefix, oldVals.key)
         end
-        for k, v in pairs(curVals) do
-            self.values[k] = v
-        end
-        if oldVals.key then
-            conn:sremove(self.ed.prefix, oldVals.key)
-        end
-        self:resetFKeys(oldVals)
-        self:resetKey(oldVals)
         self:removeOldParents(oldVals, conn)
         if not nocommit then
             conn:commit()
         end
-        self:_notify(oldVals)
-        return oldVals
+        if fields then
+            self:_notify(oldVals)
+        end
+        return oldVals, nil
+    end,
+    getNotified = function (self, conn)
+        local ok, err
+        local onAction = utils.popKey(self.values, "on")
+        local viewableCat = utils.popKey(self.values, "viewable")
+        local columnPrefix = utils.popKey(self.values, "columnPrefix")
+        local tobeDeleted = utils.popKey(self.values, "delete")
+        if not tobeDeleted then
+            local thruDate = self.values.thruDate
+            if thruDate then
+                local nowEpoch = os.time()
+                local thruEpoch = utils.timeFromDbStr(thruDate)
+                if thruEpoch < nowEpoch then
+                    tobeDeleted = true -- expired
+                end
+            end 
+        end
+        if tobeDeleted then
+            ok, err = self:delete(conn)
+        else
+            ok, err = self:save(conn)
+        end
+        return ok, err
     end
 }
 local _ED = {}
@@ -318,7 +355,6 @@ _ED.__index = {
             if not key then
                 return nil, err
             end
-            ngx.log(ngx.DEBUG, "ev.values['key'] = "..(ev.values["key"] or "NIL")..". ev.values.key = "..(ev.values.key or "NIL"))
         end
         return ev
     end,
@@ -353,7 +389,7 @@ _ED.__index = {
         local fKEntities = {}
         for fnFK, enFK in pairs(fkFields) do
             if entityData[fnFK] ~= nil then
-                fKEntities[fnFK] = ed[enFK]:new({key = entityData[fnFK] })
+                fKEntities[fnFK] = ed[enFK]:new({key = entityData[fnFK] }, true)
             end
         end
         return fKEntities
@@ -432,13 +468,47 @@ ed = {
         fnIds = {"productStoreId"},
         fnFKs = {_idx = "_Index"}
     }, _ED),
+    ProductStoreCategory = setmetatable({
+        ename = "ProductStoreCategory",
+        prefix = "psc",
+        fnIds = {"productStoreId", "productCategoryId", "storeCategoryTypeEnumId"},
+        fnFKs = {_idx = "_Index", productStoreId = "ProductStore", productCategoryId = "ProductCategory", storeCategoryTypeEnumId = "_Enum"}
+    }, _ED),
+    ProductStoreProduct = setmetatable({
+        ename = "ProductStoreProduct",
+        prefix = "psp",
+        fnIds = {"productStoreId", "productId"},
+        fnFKs = {_idx = "_Index", productStoreId = "ProductStore", productId = "Product", signatureRequiredEnumId = "_Enum"}
+    }, _ED),
     ProductStorePromotion = setmetatable({
         ename = "ProductStorePromotion",
         prefix = "psm",
         fnIds = {"storePromotionId"},
         fnFKs = {productStoreId = "ProductStore", _idx = "_Index"}
     }, _ED),
+    ProductReview = setmetatable({
+        ename = "ProductReview",
+        prefix = "pa",
+        fnIds = {"productReviewId"},
+        fnFKs = {productId = "Product"}
+    }, _ED),
 }
+-- generate a field keeping child relations for each ed:
+for name, def in pairs(ed) do
+    if name:sub(1,1) ~= '_' then
+        local fnFks = def.fnFKs
+        for col, ename in pairs(fnFks) do
+            if name:sub(1,1) ~= '_' then
+                local parentDef = ed[ename]
+                if not parentDef.rJoins then
+                    parentDef.rJoins = {}
+                end
+                parentDef.rJoins[#parentDef.rJoins+1] = getRelationKey(def, col, "");
+            end
+        end
+    end
+end
+
 local idxEvs = utils.newTable(0, 2)
 idxEvs["idx:index"] = {key = "idx:index", id = "index"}
 idxEvs["all"] = {"idx:index"}
