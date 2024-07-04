@@ -322,7 +322,7 @@ local function loadLeft(selfInstance, vRecord, conn, reversed)
             end
     
             if not selfInstance.groupBy[k][leftKey] then
-                selfInstance.groupBy[k][leftKey] = utils.ArraySet.new()
+                selfInstance.groupBy[k][leftKey] = utils.ArraySet:new()
             end
             selfInstance.groupBy[k][leftKey]:add(vRecord)
         end
@@ -410,7 +410,7 @@ local function loadByFk(selfInstance, fKeyColumn, fKeyValue, conn, reversed)
     end
     local group = selfInstance.groupBy[fKeyColumn][fKeyValue]
     if not group then
-        group = utils.ArraySet.new() -- records will be added to group in 'addRecord'
+        group = utils.ArraySet:new() -- records will be added to group in 'addRecord'
         selfInstance.groupBy[fKeyColumn][fKeyValue] = group
     end
     if joinInfo.loadedBy and joinInfo.loadedBy[fKeyValue] then
@@ -508,7 +508,7 @@ function select(selfInstance, where)
 end
 
 
-local __instance = utils.ArraySet.new()
+local __instance = utils.ArraySet:new()
 __instance.lookup = lookup
 __instance.traverseBack = traverseBack
 __instance.notifyAll = notifyAll

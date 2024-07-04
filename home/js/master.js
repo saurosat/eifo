@@ -1,4 +1,33 @@
 const screenWidth = screen.width;
+const jsonContentType = "application/json;charset=UTF-8";
+String.prototype.hashCode = function() {
+    var hash = 0,
+      i, chr;
+    if (this.length === 0) return hash;
+    for (i = 0; i < this.length; i++) {
+      chr = this.charCodeAt(i);
+      hash = ((hash << 5) - hash) + chr;
+      hash |= 0; // Convert to 32bit integer
+    }
+    return hash;
+}
+  
+// const categories = {* catJson *};
+// const sessionToken = "{* token *}";
+// const storeId = "{* storeId *}";
+// const currencyUomId = "{* currencyUomId *}"
+
+function getHeaders() {
+    let ua = Alpine.store('user')
+    let headers = { "Content-Type": "application/json;charset=UTF-8", "store": storeId, "SessionToken": ua.token }
+    if(ua.apiKey != null) {
+        headers["api_key"] = ua.apiKey;
+    }
+    return headers;
+}
+function getReqConfig(method) {
+    return { headers: getHeaders(), hostname: "localhost", port: "8080", protocol: "http:", method: method }
+}
 function loadHtml(url, containerEle) {
     if(!url) return;
     fetch(url)
@@ -19,6 +48,7 @@ function logout() {
 }
 document.addEventListener('alpine:init', () => {
     Alpine.store('user', {
+        loggedIn: Alpine.$persist(false).using(sessionStorage),
         username: Alpine.$persist(''),
         // firstName: '',
         // lastName: '',
@@ -27,8 +57,9 @@ document.addEventListener('alpine:init', () => {
         token: Alpine.$persist(sessionToken).using(sessionStorage),
         apiKey: Alpine.$persist('').using(sessionStorage),
         userId: Alpine.$persist('').using(sessionStorage),
-        firstName: Alpine.$persist('').using(sessionStorage),
-        emailAddress: Alpine.$persist('').using(sessionStorage),
+        firstName: Alpine.$persist('_NA_').using(sessionStorage),
+        lastName: Alpine.$persist('_NA_').using(sessionStorage),
+        emailAddress: Alpine.$persist('_NA_').using(sessionStorage),
         locale: Alpine.$persist('').using(sessionStorage),
         setCustomerInfo(data) {
             this.username = data.username;
@@ -46,62 +77,84 @@ document.addEventListener('alpine:init', () => {
                 this.username = '';
                 this.apiKey = '';
                 this.token = '';
+                this.loggedIn = false;
             });
+        },
+        register() {
+
         }
     });
     Alpine.store('cartInfo', {
-        "paymentsTotal": 0,
-        "orderPromoCodeDetailList": [],
-        "paymentInfoList": [],
-        "orderItemList": [],
-        "orderItemWithChildrenSet": [],
-        "totalUnpaid": 0,
-        "orderPart": null,
-        "orderHeader": null
-    });
-    Alpine.store('global', {
-        carouselImages: [
-            "https://images.unsplash.com/photo-1444212477490-ca407925329e?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=1400&q=80",
-            "https://images.unsplash.com/photo-1504595403659-9088ce801e29?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80",
-            "https://images.unsplash.com/photo-1518378188025-22bd89516ee2?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80",
-            "https://images.unsplash.com/photo-1519150268069-c094cfc0b3c8?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=1378&q=80"
-        ],
-        loggedIn: false,
-        loginDialogOpen: false,
-        cartDialogOpen: false,
-        headers: { "Content-Type": "application/json;charset=UTF-8", "store": storeId, "SessionToken": Alpine.store('user').token},
-    });
-    Alpine.data('dropdown', () => ({
+        paymentsTotal: Alpine.$persist(0),
+        orderPromoCodeDetailList: Alpine.$persist([]),
+        paymentInfoList: Alpine.$persist([]),
+        orderItemList: Alpine.$persist([]),
+        orderItemWithChildrenSet: Alpine.$persist([]),
+        totalUnpaid: Alpine.$persist(0),
+        orderPart: Alpine.$persist({}),
+        orderHeader: Alpine.$persist({}),
+        productsQuantity: Alpine.$persist(0),
         open: false,
-        toggle() {
-            if (this.open) {
-                return this.close();
+        assign(data) {
+            if(typeof(data.orderItemList) == 'undefined') return;
+            for(var i = 0; i < data.orderItemList.length; i++) {
+                if(data.orderItemList[i].itemTypeEnumId == 'ItemProduct') {
+                    this.productsQuantity += data.orderItemList[i].quantity;
+                }
             }
-
-            this.$refs.button.focus();
-            this.open = true;
+            Object.assign(this, data)
         },
-        close(focusAfter) {
-            if (!this.open) return
-
-            this.open = false
-
-            focusAfter && focusAfter.focus()
-        }
-    }));
-    Alpine.data('carouselObj', () => ({
-        current: 0,
-        images: Alpine.store('global').carouselImages,
-        next: function () {
-            this.current++;
-            if (this.current > this.images.length) this.current = 0;
+        reset() {
+            this.paymentsTotal = 0;
+            this.totalUnpaid = 0;
+            this.productsQuantity = 0;
+            this.orderPromoCodeDetailList = [];
+            this.paymentInfoList = [];
+            this.orderItemList = [];
+            this.orderItemWithChildrenSet = [];
+            this.orderPart = {};
+            this.orderHeader = {};
         },
-        prev: function () {
-            this.current--;
-            if (this.current === -1) this.current = this.images.length; //added one more slide
+        load() {
+            ProductService.getCartInfo(getReqConfig("post"))
+                    .then((data) => {
+                        this.reset();
+                        this.assign(data);
+                    });
+        },
+        addProduct(product, quantity = 1) {
+            var ua = Alpine.store('user');
+            if(ua.loggedIn) {
+                ProductService.addProductCart(product, getReqConfig("post"))
+                        .then(function (data) {
+                            this.reset();
+                            this.assign(data);
+                        });
+            } else {
+                let pItemIndex = this.orderItemList.findIndex(item => item.productId === product.productId)
+                let pItem = this.orderItemList[pItemIndex]
+                if(pItem) {
+                    pItem.quantity += quantity;
+                    if(pItem.quantity <= 0) {
+                        this.orderItemList.splice(pItemIndex, 1)
+                    }
+                } else {
+                    if(quantity > 0) {
+                        pItem = {...product, quantity: quantity, currencyUomId: currencyUomId, productStoreId: storeId};
+                        this.orderItemList.push(pItem)
+                    }
+                }
+            }
+            alert("Added product " + product.pseudoId);
+        },
+        removeProduct(product, index = -1) {
+            let pIndex = index >= 0 ? index : this.orderItemList.findIndex(item => item.productId === product.productId)
+            this.orderItemList.splice(pIndex, 1)
         }
+    });
 
-    }));
+    Alpine.data('cartDialog', (dialog) => (new Cart(dialog)));
+
     Alpine.data('searchObj', () => ({
         cat: 'All',
         query: '',
@@ -122,7 +175,7 @@ document.addEventListener('alpine:init', () => {
         password: null,
         open: false,
         errorMsg: null,
-        headers: Alpine.store('global').headers,
+        headers: getHeaders(),
         isLoading: false,
         login() {
             if (this.username.length < 3 || this.password.length < 3) {
@@ -133,15 +186,16 @@ document.addEventListener('alpine:init', () => {
             this.isLoading = true;
             this.errorMsg = null; 
             LoginService.login({ username: this.username, password: this.password }
-                , { headers: this.headers, hostname: "localhost", port: 8080, protocol: "http:", method: "post"})
+                , getReqConfig("post"))
                 .then((data) => {
                     let userStore = Alpine.store('user');
                     userStore.setCustomerInfo(data.customerInfo);
                     userStore.token = data.moquiSessionToken;
                     userStore.apiKey = data.apiKey;
-                    Alpine.store('global').headers["api_key"] = data.apiKey;
                     this.open = false;
                     this.isLoading = false;
+                    this.loggedIn = true;
+                    Alpine.store('cartInfo').load()
                 })
                 .catch((error) => {
                     if (!!error.response && !!error.response.headers) {

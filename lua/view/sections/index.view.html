@@ -1,5 +1,4 @@
-<!-- carouselObj -->
-<div x-data="carouselObj" class="w-full mx-auto relative">
+<div x-data="new Carousel($el.children[0], true)" class="w-full mx-auto relative">
     <div class="relative w-full overflow-x-hidden shadow-2xl rounded" style="padding-top: 36%">
         <div class="absolute top-0 left-0 h-full bg-green-100 flex transition-transform flex-shrink-0"
             :style="`transform: translateX(${-100 * current}%)`">

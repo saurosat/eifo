@@ -24,14 +24,18 @@ rwmt.commit = function(self)
     -- reset rollback stack:
     self._rollback:reset()
 end
-rwmt.incr = function(self, lockKey)
-    return self.connection:incr(lockKey)
+rwmt.incr = function(self, key)
+    return self.connection:incr(key)
 end
-rwmt.decr = function(self, lockKey)
-    return self.connection:decr(lockKey)
+rwmt.decr = function(self, key)
+    return self.connection:decr(key)
 end
-rwmt.getdel = function(self, lockKey)
-    return self.connection:getdel(lockKey)
+rwmt.set = function(self, key, value, overwrite)
+    return overwrite and self.connection:set(key, value)
+            or self.connection:setnx(key, value)
+end
+rwmt.getdel = function(self, key)
+    return self.connection:getdel(key)
 end
 
 rwmt.lget = function(self, key, startPos, endPos)
@@ -132,7 +136,7 @@ rwmt.hset = function(self, key, hashValue, autocommit)
             self._rollback:push({f = rwmt.hdel, params = {self, key, newFields, true}})
         end
     end
-    return oldVals
+    return oldVals, nil, newVals
 end
 rwmt.hdel = function(self, key, fields, autocommit)
     local curvals = self:hgetall(key)
@@ -254,9 +258,8 @@ local connFactory = {
         timeout = timeout or eifo.db.timeout or ngx.var.timeout
         local connection, err = redisAgent:new()
         if not connection then
-            local errMsg = "Can not initialized DB connection "
-            ngx.log(ngx.CRIT, errMsg + ": " + (err or "Unknown error"))
-            return nil, errMsg
+            local errMsg = "Can not initialized DB connection "+ ": " + (err or "Unknown error")
+            error(errMsg, ngx.ERR)
         end
         connection:set_timeouts(timeout)
         local dbconn = {

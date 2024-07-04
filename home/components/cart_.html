@@ -1,0 +1,120 @@
+<div class="mx-auto max-w-4xl bg-gray-200">
+    <div class="w-full mt-0 h-8 bg-transparent flex flex-row-reverse">
+        <button x-on:click="open = ! open" class="bg-transparent mt-0 ml-auto hover:bg-gray-50">
+            <svg class="w-7 h-7 fill-black ">
+                <use xlink:href="#x"></use>
+            </svg>
+        </button>
+    </div>
+
+    <h1 class="text-3xl font-bold tracking-tight text-gray-900">Shopping Cart</h1>
+
+    <form class="mt-12">
+        <h2 class="sr-only">Items in your shopping cart</h2>
+        <div class="mt-10 sm:ml-32 sm:pl-6 mx-auto max-w-4xl">
+            <h2 class="text-xl font-bold mb-4">Product Items</h2>
+            <template x-for="pItem in cartStore.orderItemList">
+                <div class="mb-4">
+                    <div class="flex items-center justify-between border-b border-gray-200 py-4">
+                        <div class="flex-shrink-0">
+                            <template x-if="pItem.imageUrl" >
+                                <!-- Replace 'imageUrl' with the actual property from your ViewModel -->
+                                <img src="pItem.imageUrl" class="h-24 w-24 rounded-lg object-cover object-center sm:h-32 sm:w-32">
+                            </template>
+                        </div>
+    
+                        <div class="relative ml-4 flex flex-1 flex-col justify-between sm:ml-6">
+                            <div class="flex justify-between sm:grid sm:grid-cols-2">
+                                <div class="pr-6">
+                                    <h3 class="text-sm">
+                                        <!-- Replace 'itemDescription' with the actual property from your ViewModel -->
+                                        <a href="#" class="font-medium text-gray-700 hover:text-gray-800" x-text="pItem.description"></a>
+                                    </h3>
+                                    <p class="mt-1 text-sm text-gray-500">pItem.productName</p>
+                                </div>
+    
+                                <p class="text-right text-sm font-medium text-gray-900">
+                                    <!-- Replace 'unitAmount' with the actual property from your ViewModel -->
+                                    <span x-text="pItem.quantity"></span>
+                                </p>
+                            </div>
+    
+                            <div class="mt-4 flex items-center sm:absolute sm:left-1/2 sm:top-0 sm:mt-0 sm:block">
+                                <label for="quantity-0" class="sr-only">Quantity, Nomad Tumbler</label>
+                                <select name="quantity-0" class="block max-w-full rounded-md border border-gray-300 py-1.5 text-left text-base font-medium leading-5 text-gray-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                    <option value="6">6</option>
+                                    <option value="7">7</option>
+                                    <option value="8">8</option>
+                                </select>
+    
+                                <button type="button" class="ml-4 text-sm font-medium text-indigo-600 hover:text-indigo-500 sm:ml-0 sm:mt-3">
+                                    <span>Remove</span>
+                                </button>
+                            </div>
+                        </div>
+    
+                        <p class="mt-4 flex space-x-2 text-sm text-gray-700">
+                            <svg class="h-5 w-5 flex-shrink-0 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                            </svg>
+                            <span>In stock</span>
+                        </p>
+                    </div>
+                </div>    
+            </template>
+        </div>
+
+
+        <!-- Order summary -->
+        <div id="orderSummary" class="mt-10 sm:ml-32 sm:pl-6">
+            <div class="rounded-lg bg-gray-50 px-4 py-6 sm:p-6 lg:p-8">
+                <h2 class="sr-only">Order summary</h2>
+
+                <div class="flow-root">
+                    <dl class="-my-4 divide-y divide-gray-200 text-sm">
+                        <!-- ko foreach: orderSummaryItems -->
+                        <div class="flex items-center justify-between py-4">
+                            <dt class="text-gray-600">Total Items</dt>
+                            <dd class="font-medium text-gray-900" x-text="cartStore.orderItemList.length"></dd>
+                            <dt class="text-gray-600">Subtotal</dt>
+                            <dd class="font-medium text-gray-900" x-text="cartStore.totalUnpaid"></dd>
+                            <!-- 
+                          </div>
+                          <div class="flex items-center justify-between py-4">
+                            <dt class="text-gray-600">Shipping</dt>
+                            <dd class="font-medium text-gray-900">$5.00</dd>
+                          </div>
+                          <div class="flex items-center justify-between py-4">
+                            <dt class="text-gray-600">Tax</dt>
+                            <dd class="font-medium text-gray-900">$8.32</dd>
+                          </div>
+                          <div class="flex items-center justify-between py-4">
+                            <dt class="text-base font-medium text-gray-900">Order total</dt>
+                            <dd class="text-base font-medium text-gray-900">$112.32</dd> -->
+                        </div>
+                        <!-- /ko -->
+
+                    </dl>
+                </div>
+            </div>
+            <div class="mt-10">
+                <button type="submit" class="w-full rounded-md border border-transparent bg-indigo-600 px-4 py-3 text-base font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-50">Checkout</button>
+            </div>
+
+            <div class="mt-6 text-center text-sm text-gray-500">
+                <p>
+                    or
+                    <a href="#" class="font-medium text-indigo-600 hover:text-indigo-500">
+                        Continue Shopping
+                        <span aria-hidden="true"> &rarr;</span>
+                    </a>
+                </p>
+            </div>
+        </div>
+    </form>
+</div>

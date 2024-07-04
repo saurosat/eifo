@@ -5,14 +5,70 @@
 ---
 
 local utils = eifo.utils
-local eds = eifo.dao
-local workPermit = eifo.workPermit
+local lock = require "eifo.lock"
 local ngx = ngx
 
-local viewClass = setmetatable(utils.newTable(0,8), {__index = function (self, key)
-        return nil;
-    end})
-viewClass.getConn = function (...)
+local _view = setmetatable({}, {__index = {
+    _update = function ()
+        ngx.log(ngx.WARN, "_update() is not implemented")
+    end
+}})
+
+function _view:new(paths, viewFile)
+    local view = setmetatable({}, self)
+    self.__index = self
+
+    view.template = viewFile
+    -- local _, startPos = string.find(modelFile, "/lua/view/") 
+    local package = "view"
+    for i = 1, #paths, 1 do
+        package = package.."."..paths[i]
+    end
+    view._observerId = package
+    local viewInfo = require(package)
+    if not viewInfo or type(viewInfo) ~= "table" then
+        return nil
+    end
+    local tableDef = viewInfo.tableDef 
+                    or assert(viewInfo.tableName and eifo.db.table[viewInfo.tableName])
+    view.table = tableDef:new({
+        leftColumns = viewInfo.leftColumns,
+        rightColumns = viewInfo.rightColumns,
+        skippedTables = viewInfo.skippedTables,
+        toJsonColumns = viewInfo.toJsonColumns,
+    })
+    view.name = paths[#paths]
+    view.loadData = viewInfo.loadData
+    view.layout = viewInfo.layout
+    view.layoutUri = viewInfo.layoutUri
+    view.key = viewInfo.key
+    if view.key then
+        paths[#paths] = nil
+    end
+    view.toJson = viewInfo.toJson
+    if viewInfo.outputFile then
+        local outPath = eifo.basePath.."/home"
+        for i = 1, #paths, 1 do
+            if paths[i] ~= "index" then
+                outPath = outPath.."/"..paths[i]
+                -- check if location exists:
+                local ok, _, code = os.rename(outPath, outPath)
+                if not ok and code ~= 13 then
+                    -- if not, create the dir
+                    os.execute("mkdir "..outPath)
+                    os.execute("mkdir "..outPath.."/no_layout")
+                end
+            end
+        end
+        view.outPath = outPath
+        view.table:_attach(view)
+    end
+    view.paths = paths
+
+    return view
+end
+
+_view.getConn = function (...)
     local conn, err = eifo.db.conn.redis()
     if not conn then
         return nil, err
@@ -20,168 +76,126 @@ viewClass.getConn = function (...)
     conn:connect()
     return conn
 end
-viewClass.getOutFile = function(self, key)
-    if self.componentPath then
-        return self.location.."/"..self.name..".html"
+_view.getOutFile = function(self, key, noLayout)
+    local sub = noLayout and "/no_layout/" or "/"
+    if self.key then
+        return self.outPath..sub..self.name..".html"
     end
-    if not key or key == "index" then
-        return self.location.."/index.html", "index"
-    end
-    local prefix = self.modelBuilder.ed.prefix
-    local nonPrefixKey = key:sub(prefix:len() + 2, -1)
-    return self.location.."/".. nonPrefixKey ..".html", nonPrefixKey
+    return self.outPath..sub..key..".html"
 end
 
-viewClass._update = function(self, vModel, _)
-    local conn, err = eifo.db.conn.redis()
-    if not conn then
-        return nil, err
+_view._update = function(self, records, oldVals, newVals) --TODO: 
+    local record = records[1]
+    local outFile = self:getOutFile(record.key)
+    local lockObj = lock(outFile)
+    if lockObj then
+        os.remove(outFile) --> the updater should remove this lock
     end
-    conn:connect()
-    local numRecords = #vModel
-    for i = 1, numRecords, 1 do
-        local record = vModel[i]
-        local outFile, nonPrefixKey = self:getOutFile(record.key)
-        workPermit.create(outFile, nonPrefixKey, conn)
+    local outFile = self:getOutFile(record.key)
+    local lockObj = lock(outFile)
+    if lockObj then
+        os.remove(outFile) --> the updater should remove this lock
+    end
+
+    outFile = self:getOutFile(record.key, true)
+    lockObj = lock(outFile)
+    if lockObj then
         os.remove(outFile)
     end
-    conn:disconnect()
 end
 
-viewClass.process = function(self, params)
+_view.process = function(self, params, noLayout)
     ngx.log(ngx.INFO, (self.name or "root")..": "..table.concat(params, ","))
     local numParams = (params and #params) or 0
-    if numParams == 0 then
-        params[1] = "index" --> TODO: create a root ED and only one record with ID='index'
-        numParams = 1
-    end
-    local minParams = self.minParams or 0
-    if numParams < minParams then
-        ngx.log(ngx.INFO, "Require minimum "..tostring(minParams).." parameter")
-        return
-    end
-
-    -- IF there is a sub-view has matched name-pattern, pass control to it:
-    local subView = self.children[params[1]]
-    if subView then
-        ngx.log(ngx.INFO, "Dispatch to subview "..subView.name)
-        table.remove(params, 1)
-        return subView:process(params)
-    end
-
+    
     local conn = self:getConn()
     if not conn then
         utils.responseError(500, "Got some problems! We will fix it soon. Please come back later")
         return
     end
     conn:connect()
-    local model, key, err = self:getModel(params, conn)
+    local model, key, err = self:loadData(params, conn)
+    conn:disconnect()
     if not model then
-        if not self.modelBuilder then
-            err = "Non-container view without ModelBuilder attached: Name = "..(self.name or "nil")..". Params ="..table.concat(params)
-        else
-            err = "Entity not found whil searching with params "..table.concat(params)..": "..(err or "(No error info)")
-        end
         ngx.log(ngx.INFO, err)
         utils.responseError(ngx.HTTP_NOT_FOUND, "Page not found ")
-        conn.disconnect()
         return
     end
-    local html = self:getHtml(model)
-    ngx.header["Content-type"] = "text/html; charset=utf-8"
-    ngx.say(html)
 
-    local outPathFile, evKey = self:getOutFile(key)
-    --local wp = {} -- For testing purpose only (delete file manually)
-    local wp = workPermit.get(outPathFile, conn) 
-    conn:disconnect();
-    if wp ~= nil then -- write html to a static file 
-        local f = assert(io.open(outPathFile, "w"))
-        f:write(html)
-        f:close()
+    local renderedText = self:render(model, noLayout)
+    ngx.header.content_type = self.contentType
+    ngx.send_headers()
+    ngx.print(renderedText)
+    ngx.eof()
+
+    if self.outPath then
+        local outPathFile = self:getOutFile(key, noLayout)
+        local lock = require "eifo.lock"(outPathFile)
+        if lock then -- write renderedText to a static file 
+            local f = assert(io.open(outPathFile, "w"))
+            f:write(renderedText)
+            f:close()
+            lock:unlock()
+        end
     end
 end
-viewClass.getModel = function(self, params, conn)
-    local vModel, key
-
-    if self.modelBuilder then
-        key = self.modelBuilder.ed:generateKey(params)
-        vModel = self.modelBuilder:newVModel(false, self.ignoredTables or false)
-        local vRecord, err = vModel:loadByKey(key, conn)
-        if not vRecord then
+_view.loadData = function(self, params, conn)
+    local tbl, key
+    if self.key then
+        params = {key = self.key}
+    elseif #params == 1 then
+        params = {key = params[1]}
+    elseif not params or #params == 0 then
+        return nil, nil, "No search params"
+    end
+    if self.table then
+        tbl = self.table:new()
+        tbl:init()
+        key = self.table:generateKey(params)
+        ngx.log(ngx.DEBUG, "Loading key "..key)
+        local record, err = tbl:load({key = key}, conn)
+        if not record then
             err = err or "No records found. Please check maxLevel setting"
             return nil, nil, err
         end
     end
-    if self.componentPath then
-        if not vModel then
-            vModel = {}
-        end
-        local path = self.componentPath
-        for i = 1, #params, 1 do
-            path = path.."/"..params[i]
-        end
-        vModel.pathParam = path
-    end
-    return vModel, key
+    return tbl, key
 end
-viewClass.getHtml = function(self, model)
+_view.render = function(self, model, noLayout)
+
     model = model or {}
 
-    ngx.log(ngx.DEBUG, "\r\n\r\n Start rendering: \r\n")
-    local template = require("resty.template").new()
-    local fn = template.compile(self.template, "no-cache")
-    --ngx.log(ngx.DEBUG, utils.toString(fn))
-    -- ngx.log(ngx.NOTICE, utils.toString(v.compile, ":", "\n"))
-    ngx.log(ngx.DEBUG, "\r\n\r\n End rendering: \r\n")
-
-    return fn({model = model})
-end
-viewClass.addSub = function(self, view)
-    self.children[view.name] = view
-    return self
-end
-viewClass.createSub = function(self, name, template, modelBuilder, minParams, componentPath)
-    local sub = viewClass.new(name, template, modelBuilder, minParams, self, componentPath)
-    self:addSub(sub)
-    return sub
-end
-viewClass.new = function(name, template, viewModelClass, minParams, parent, componentPath)
-    local basePath = eifo.basePath
-    local location = (parent and parent.location) or basePath.."/home" -- TODO: make this configurable
-    local path = location.."/"..(name or "")
-
-    if (not componentPath) and name and name:len() > 0 and name ~= "index" then
-        location = path
-        local ok, _, code = os.rename(location, location) -- check if location exist
-        if not ok and code ~= 13 then
-            os.execute("mkdir "..location) --TODO: make the mkdir command configurable
+    --ngx.log(ngx.DEBUG, "\r\n\r\n Rendering: \r\n")
+    if self.template then
+        local template = require("resty.template")
+        local fn = template.compile(self.template, "no-cache")
+        local sHtml = fn({model = model, main = "{* main *}"}) --> main for layout pre-compile
+        if noLayout or not (self.layoutUri or self.layout) then
+            return sHtml
         end
+        local fnLayout
+        if self.layoutUri then
+            ngx.req.read_body()
+            --ngx.location.capture.options= 
+            local res = ngx.location.capture(self.layoutUri, 
+                {copy_all_vars = false,
+                share_all_vars = false, 
+                always_forward_body = false, 
+                method = ngx.HTTP_GET, 
+                args = {}, body = "", ctx = {}, vars = {}})
+            local sLayout = res.body
+            fnLayout = template.compile(sLayout, true)
+        else
+            fnLayout = template.compile(self.layout)
+        end
+        --ngx.log(ngx.DEBUG, utils.toJson(fnLayout))
+        return fnLayout({main = sHtml, model = model})
     end
-
-    local viewObj = {
-        name = name,
-        location = location,
-        componentPath = componentPath,
-        modelBuilder = viewModelClass,
-        _observerId = path,
-        template = template,
-        minParams = minParams,
-        parent = parent,
-        children = {}
-    }    
-
-    setmetatable(viewObj, {__index = viewClass})
-    -- subscribe to get notifications from EDs:
-    if viewModelClass then
-        viewModelClass:_attach(viewObj)
+    if self.toJson then
+        return self:toJson(model)
     end
-    --ngx.log(ngx.INFO, "\r\n\r\n Render Source Code: \r\n")
-    --ngx.log(ngx.INFO, utils.sourceCode(view.render))
-    --ngx.log(ngx.INFO, "\r\n_______________________________________________ \r\n")
-
-
-    return viewObj
+    return model:toJson()
 end
 
-return viewClass
+
+return _view

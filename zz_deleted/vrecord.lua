@@ -111,7 +111,7 @@ local function convertTreeToString(self, pattern, propNames, categoryType)
     end
     for i = 1, #childs, 1 do
         if childs[i] then
-            local subCat = self.vModel.keys[childs[i].productCategoryId]
+            local subCat = self.vModel.keys(childs[i].productCategoryId)
             str = str..convertTreeToString(subCat, pattern, propNames, categoryType)
         end
     end
@@ -164,7 +164,7 @@ end
 local function addToArrayField(tbl, fieldName, value)
     local array = tbl[fieldName]
     if not array then
-        array = utils.ArraySet.new()
+        array = utils.ArraySet:new()
         tbl[fieldName] = array
     end
     array[#array+1] = value

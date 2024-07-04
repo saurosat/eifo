@@ -3,13 +3,38 @@
 --- Created by tnguyen.
 --- DateTime: 10/11/23 7:55 AM
 ---
-if not eifo.view.index then
-    ngx.log(ngx.ERR, "root view is not initialized")
-    eifo.utils.responseError(ngx.HTTP_SERVICE_UNAVAILABLE, "Service is temporarily down")
-    return
-end
+-- if not eifo.view.index then
+--     ngx.log(ngx.ERR, "root view is not initialized")
+--     eifo.utils.responseError(ngx.HTTP_SERVICE_UNAVAILABLE, "Service is temporarily down")
+--     return
+-- end
 ngx.log(ngx.INFO, "URI: ____"..ngx.var.request_uri.."_____")
 local params = eifo.utils.getPathParam(ngx.var.request_uri)
+if params[1] == "api" then
+    table.remove(params, 1)
+end
+ngx.log(ngx.DEBUG, table.concat(params))
+-- local noLayout = params[1] == "no_layout"
+-- if noLayout then
+--     table.remove(params, 1)
+-- end
 
-ngx.log(ngx.INFO, table.concat(params, ","))
-eifo.view.index:process(params)
+-- ngx.log(ngx.INFO, table.concat(params, ","))
+-- eifo.view.index:process(params)
+
+local route = eifo.route:getRoute(params)
+if not route.view then
+    eifo.utils.responseError(404, "Resource not found")
+    return
+end
+local pos = route.pos + 1
+local noLayout = false
+if params[pos] == "no_layout" then
+    pos = pos + 1
+    noLayout = true
+end
+local vParams = {}
+for i = pos, #params, 1 do
+    vParams[#vParams+1] = params[i]
+end
+route.view:process(vParams, noLayout)

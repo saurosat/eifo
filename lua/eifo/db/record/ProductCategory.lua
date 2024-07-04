@@ -1,30 +1,82 @@
 local utils = require "eifo.utils"
-local Record = require "eifo.db.record.Record"
-if eifo.db.record.ProductCategory then
-    return eifo.db.record.ProductCategory
+local baseRecord = require "eifo.db.record.Record"
+local record = baseRecord:createSubClass({className = "ProductCategory"})
+function record:getParents()
+    local parents = self:getMetaValue("parents", true) 
+    if parents then
+        return parents
+    end
+    local tbl = self._table
+    local rTbl = tbl._rightTables["ProductCategoryRollup"]
+    if not rTbl then
+        return {}
+    end
+    parents = {}
+    local rollups = self.rollups or {}
+    for i = #rollups, 1, -1 do
+        local parent = tbl:keys(rollups[i].parentProductCategoryId)
+        if not parent then
+            rollups:remove(rollups[i])
+            rTbl:remove(rollups[i])
+        else
+            parents[parent.productCategoryTypeEnumId] = parent
+        end
+    end
+    self.setMetaValue("parents", parents)
+    return parents
 end
-eifo.db.record.ProductCategory = Record:createSubClass()
-local record = eifo.db.record.ProductCategory
-function record:getAllProducts (catType, directOnly)
+function record:getChildren()
+    local children = self:getMetaValue("children", true) 
+    if children then
+        return children
+    end
+    local tbl = self._table
+    if not tbl then
+        ngx.log(ngx.ERR, self.className.." record "..utils.toJson(self).." has no associated table")
+    end
+    local rTbl = tbl._rightTables["ProductCategoryRollup"]
+    if not rTbl then
+        return {}
+    end
+    children = {}
+    local rollups = self.childRollups or {}
+    local tbl = self._table
+    for i = #rollups, 1, -1 do
+        local child = tbl:keys(rollups[i].productCategoryId)
+        if not child then
+            rollups:remove(rollups[i])
+            rTbl:remove(rollups[i])
+        else
+            local childCatType = child.productCategoryTypeEnumId
+            if not children[childCatType] then
+                children[childCatType] = utils.ArraySet:new()
+            end
+            children[childCatType]:add(child)
+        end
+    end
+    self.setMetaValue("children", children)
+    return children
+end
+function record:getProducts (catType)
     --ngx.log(ngx.DEBUG, "catType = "..(catType or "nil"))
     catType = catType or nil
     local products = {}
     local catMems = self.catMems
-    if not catMems then
-        --ngx.log(ngx.DEBUG, "selv.ignoredTables = "..(self.ignoredTables or "nil"))
-        return products
+    if catMems then
+        for i = 1, #catMems, 1 do 
+            products[#products + 1] = catMems[i].product
+        end
+    else
+        ngx.log(ngx.DEBUG, self.key..": No catMems found")
     end
-    for i = 1, #catMems, 1 do 
-        products[#products + 1] = catMems[i].product
-    end
+    local directOnly = not catType
     if not directOnly then
-        local childCats = self.children
-        if childCats then
-            for i = 1, #childCats, 1 do 
-                local childCat = childCats[i].productCategory
-                -- ngx.log(ngx.DEBUG, "childCat.productCategoryTypeEnumId = "..(childCat.productCategoryTypeEnumId or "nil"))
-                if catType == nil or childCat.productCategoryTypeEnumId == catType then
-                    local childCatPrds = childCat:getAllProducts(catType)
+        local children = self.children
+        for childCatType, childCats in pairs(children) do
+            if catType == nil or catType == childCatType then
+                for i = 1, #childCats, 1 do 
+                    local childCat = childCats[i]
+                    local childCatPrds = childCat:getProducts(catType)
                     for j = 1, #childCatPrds, 1 do 
                         products[#products + 1] = childCatPrds[j]
                     end
@@ -32,10 +84,10 @@ function record:getAllProducts (catType, directOnly)
             end
         end
     end
-    --ngx.log(ngx.DEBUG, "Numbers of products: " ..#products.."cat:getAllProducts, catMems: "..(catMems and tostring(#catMems) or "nil")..", childCats: "..(childCats and tostring(#childCats) or "nil"))
+    ngx.log(ngx.DEBUG, "Numbers of products: " ..#products.."cat:getProducts, catMems: "..(catMems and tostring(#catMems) or "nil"))
     return products
 end
-local function convertTreeToString(self, pattern, propNames, categoryType)
+function record:convertTreeToString(pattern, propNames, categoryType)
     if categoryType and self.productCategoryTypeEnumId ~= categoryType then
         return ''
     end
@@ -43,7 +95,7 @@ local function convertTreeToString(self, pattern, propNames, categoryType)
     for i = 1, #propNames, 1 do
         values[i] = self[propNames[i]]
     end
-    print(table.unpack(values))
+    ngx.log(ngx.DEBUG, "Convert tree to string"..utils.toJson(values))
     local str = string.format(pattern, table.unpack(values))
     local childs = self.children
     if not childs then
@@ -51,12 +103,11 @@ local function convertTreeToString(self, pattern, propNames, categoryType)
     end
     for i = 1, #childs, 1 do
         if childs[i] then
-            local subCat = self._table.keys[childs[i].productCategoryId]
-            str = str..convertTreeToString(subCat, pattern, propNames, categoryType)
+            local subCat = self._table:keys(childs[i].productCategoryId)
+            str = str..subCat:convertTreeToString(pattern, propNames, categoryType)
         end
     end
     return str;
 end
-record.convertTreeToString = convertTreeToString;
 
 return record

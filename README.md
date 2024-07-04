@@ -109,9 +109,9 @@ The only differences is the order of loaded records.
 To get loaded record, use notation: 
 ```
 vmA[0] // a record of A
-vmA.keys["A01"] // a record of A
+vmA:keys("A01") // a record of A
 vmA[1].parent //a record of A
-vmA.keys["A01"].parent //same as above
+vmA:keys("A01").parent //same as above
 vmA[1].children // a list of records of A
 vmB[0] // a record of A2A
 vmB[0].parentA // a record of A

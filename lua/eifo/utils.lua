@@ -58,10 +58,15 @@ local function sourceCode(f)
     --return table.concat(text,"\n")
 end
 local function toJson(v, refs)
-    local kvSep = ":"
     if v == nil then return "null" end
-    if not v then return "false" end
     local vType = type(v)
+    if vType ~= "table" then
+        return (vType == "string" and ('"'..v..'"'))
+                or (vType == "boolean" and (v and "true" or "false"))
+                or (vType == "function" and sourceCode(v))
+                or _G.tostring(v)
+    end
+                    
     -- prevent circular invokes:
     if not refs or #refs == 0 then
         refs = {v}
@@ -69,11 +74,12 @@ local function toJson(v, refs)
         local refsLen = #refs
         for i = 1, refsLen, 1 do
             if v == refs[i] then
-                return "null"
+                return v.key and '{key = "'..v.key..'"}' or "null"
             end
         end
         refs[refsLen + 1] = v
     end
+    local kvSep = ":"
     local str
     if vType == "table" then
         if #v > 0 then
@@ -86,22 +92,13 @@ local function toJson(v, refs)
         else
             str = "{"
             for key, val in pairs(v) do
-                str = str.."'"..key.."'"..kvSep..toJson(val, refs)..","
+                str = str..'"'..key..'"'..kvSep..toJson(val, refs)..","
             end
-            if(string.len(str) > 4) then
-                str = str.."}"
-            else
-                str = "null"
-            end
+            str = str.."}"
         end
     end
     refs[#refs] = nil
-    return  str
-            or (vType == "string" and ("'"..v.."'"))
-            or (vType == "number" and _G.tostring(v))
-            or (vType == "boolean" and "true")
-            or (vType == "function" and sourceCode(v))
-            or "null"
+    return  str or "null"
 end
 
 local function toString(v, kvSep, newLine, refs)
@@ -181,7 +178,7 @@ local detach = function(self, observerId)
     self._observers[observerId] = nil
     return self
 end
-local notify = function(self, oldVals)
+local notify = function(self, oldVals, newVals)
     if not self._observers or isTableEmpty(self._observers) then
         -- ngx.log(ngx.ALERT, "Notify without any receivers: "..toString(self, ": ", "\r\n"))
         return false, "No receivers"
@@ -191,7 +188,7 @@ local notify = function(self, oldVals)
 
     for _, v in pairs(self._observers) do
         ngx.log(ngx.DEBUG, "Receiver: "..toString(v, ": ", "\r\n"))
-        v:_update(self, oldVals)
+        v:_update(self, oldVals, newVals)
     end
     return true
 end
@@ -337,6 +334,17 @@ local splitStr = function(str, separator)
     end
     return tokens
 end
+local getPropertyValue = function (obj, propPath)
+    local propPaths = splitStr(propPath, "%.")
+    local numPaths = #propPaths
+    local i = 1
+    local objProp = obj[propPaths[i]]
+    while objProp ~= nil and i <= numPaths do
+        i = i + 1
+        objProp = objProp[propPaths[i]]
+    end
+    return objProp
+end
 
 local getPathParam = function(uri, api)
     local paramStr = uri
@@ -356,6 +364,7 @@ end
 local utils = newTable(0, 27)
 utils.sourceCode = sourceCode
 utils.splitStr = splitStr
+utils.getPropertyValue = getPropertyValue
 utils.getPathParam = getPathParam
 utils.newTable = newTable
 utils.newArray = newArray
@@ -426,46 +435,69 @@ utils.clone = function(v, refs)
     refs[#refs] = nil
     return newTbl
 end
-utils.ArraySet = {
-    add = function(self, record, noCheck)
-        if not noCheck then
-            for idx = #self, 1, -1 do
-                if self[idx] == record or self[idx].key == record.key then
-                    return idx
-                end
-            end
-        end
-        local idx = #self + 1
-        self[idx] = record
+utils.ArraySet = {_fnKey = "key"}
+function utils.ArraySet:add(record)
+    local key = record[self._fnKey] or record
+    local idx = self.__keys[key]
+    if idx then
         return idx
-    end,
-    index = function (self, itemOrKey)
-        local itemKey = itemOrKey.key or itemOrKey
-        for i = #self, 1, -1 do
-            if self[i] == itemOrKey or self[i].key == itemKey then
-                return i
-            end
-        end
-        return nil
-    end,
-    intersect = function(self, otherSet)
-        if not otherSet then
-            return self
-        end
-        local arraySet = utils.ArraySet.new()
-        for i = #otherSet, 1, -1 do
-            if self:index(otherSet[i]) then
-                arraySet:add(otherSet[i])
-            end
-        end
-        return arraySet
-    end,
-    new = function (array)
-        local arraySet = array or {}
-        setmetatable(arraySet, {__index = utils.ArraySet})
-        return arraySet
     end
-}
+    idx = #self + 1
+    self[idx] = record
+    self.__keys[key] = idx
+    return idx
+end
+
+function utils.ArraySet:index(itemOrKey)
+    local itemKey = itemOrKey[self._fnKey] or itemOrKey
+    return self.__keys[itemKey]
+end
+function utils.ArraySet:keys(itemOrKey)
+    --ngx.log(ngx.DEBUG, "ArrraySet:keys "..utils.toString(itemOrKey))
+    local itemKey = itemOrKey[self._fnKey] or itemOrKey
+    local idx = self.__keys[itemKey]
+    return idx and self[idx] or nil
+end
+
+function utils.ArraySet:remove(itemOrKey) 
+    local itemKey = itemOrKey[self._fnKey] or itemOrKey
+    local idx  = self.__keys[itemKey]
+    if(not idx) then return nil end
+    for i = idx, #self - 1, 1 do
+        self[i] = self[i+1]
+    end
+    self[#self] = nil
+    self.__keys[itemKey] = nil
+    return idx
+end
+function utils.ArraySet:intersect(otherSet)
+    if not otherSet then
+        return self
+    end
+    local arraySet = getmetatable(self):new()
+    for i = 1, #otherSet, 1 do
+        if self:index(otherSet[i]) then
+            arraySet:add(otherSet[i])
+        end
+    end
+    return arraySet
+end
+
+function utils.ArraySet:new(array, nameOfKeyField)
+    local arraySet = array or {}
+    if nameOfKeyField then
+        arraySet._fnKey = nameOfKeyField
+    end
+    arraySet.__keys = {}
+    for i = 1, #arraySet, 1 do
+        local key = arraySet[i][nameOfKeyField] or arraySet[i]
+        arraySet.__keys[key] = i
+    end
+    setmetatable(arraySet, self)
+    self.__index = self
+    return arraySet
+end
+
 utils.observable = {
     _attach = attach,
     _detach = detach,

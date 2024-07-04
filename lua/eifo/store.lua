@@ -12,13 +12,13 @@ local bit = require("bit")
 
 local store = utils.newTable(0, 12)
 store.load = function(self)
-    local eds = eifo.db.ed
+    local storeTable = eifo.db.table.ProductStore:new({rightCols = {}})
     local conn = eifo.db.conn.redis()
     conn:connect()
-    self.ev = eds.ProductStore:get(self.storeId, conn)
+    self.record = storeTable:load({key = self.storeId}, conn)
     conn:disconnect()
-    if self.ev then
-        self.secretKey = self.ev.values["secretKey"]
+    if self.record then
+        self.secretKey = self.record["secretKey"]
     end
     if not self.secretKey then
         self.secretKey = eifo.secretKey
@@ -54,7 +54,7 @@ store.getClientIp = function(self)
     local ip = nil
     for i = 1, #self.ipHeaders, 1 do
         local hIp = headers[self.ipHeaders[i]]
-        if hIp ~= nil and string.len(hIp) > 0 then
+        if hIp ~= nil and type(hIp) == 'string' and string.len(hIp) > 0 then
             hIp = string.lower(hIp)
             if hIp ~= "unknown" then
                 ip = hIp

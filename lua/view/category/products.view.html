@@ -1,0 +1,35 @@
+<script>
+    var catProducts = {
+        cats: categories,
+        key: "_NA_", productCategoryId: "_NA_", pseudoId: "_NA_", categoryName: "_NA_", products: [],
+        load: function(catKey) {
+            alert(catKey);
+            fetch("/products/byCategoryKey/" + catKey).then(response => response.json()).then(respObj => {
+                //Object.assign(this, respObj);
+                this.key = respObj.key;
+                this.productCategoryId = respObj.productCategoryId;
+                this.categoryName = respObj.categoryName;
+                this.pseudoId = respObj.pseudoId;
+                this.products = respObj.products;
+            })
+        }
+    }
+</script>
+<div class="flex flex-col" x-data="catProducts">
+    <div class="w-full">
+        <template x-for="cat in cats">
+            <button class="mx-5 border-gray-600 border rounded-s" x-text="cat.categoryName" x-on:click="load(cat.key)"></button>
+        </template>
+    </div>
+    <ul class="w-1/3 flex-shrink">
+        <li>Category ID: <span x-text="productCategoryId"></span></li>
+        <li>Category key: <span x-text="key"></span></li>
+        <li>Category name: <span x-text="categoryName"></span></li>
+        <li>Pseudo ID: <span x-text="pseudoId"></span></li>
+    </ul>
+    <div class="w-2/3">
+        <template x-for="p in products">
+            <p>Product ID: <span x-text="p.productId"></span>, Product Name: <span x-text="p.productName"></span></p>
+        </template>
+    </div>
+</div>

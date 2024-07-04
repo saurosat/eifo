@@ -44,7 +44,7 @@ local function getMetaValue(self, key)
         if leftInfo then
             local lTable = _table.leftTables[leftInfo.eName]
             if lTable then
-                return lTable.keys[self[fkKey]]
+                return lTable:keys(self[fkKey])
             end
         end
     end
@@ -71,14 +71,27 @@ local specialProductClass = productClass:createSubClass()
 function specialProductClass:get_IntroSpecial() 
     return "This is Special Product. ID is "..self.id
 end
-local sProduct = productClass:new({size = "3x4x5"}, {id = "ABCXFS001"})
-ngx.log(ngx.INFO, utils.toJson(sProduct))
-ngx.log(ngx.INFO, sProduct.id)
-ngx.log(ngx.INFO, sProduct.casdcfasdca)
-ngx.log(ngx.INFO, "Size:"..sProduct._table.size)
-sProduct = specialProductClass:new({price = "1 billion USD"}, {id = "ABCXFS002-SPECIAL"})
-ngx.log(ngx.INFO, utils.toJson(sProduct))
-ngx.log(ngx.INFO, sProduct.id)
-ngx.log(ngx.INFO, sProduct.asdasdfa)
-ngx.log(ngx.INFO, sProduct._table.size)
-ngx.log(ngx.INFO, sProduct._table.price)
+-- local sProduct = productClass:new({size = "3x4x5"}, {id = "ABCXFS001"})
+-- ngx.log(ngx.INFO, utils.toJson(sProduct))
+-- ngx.log(ngx.INFO, sProduct.id)
+-- ngx.log(ngx.INFO, sProduct.casdcfasdca)
+-- ngx.log(ngx.INFO, "Size:"..sProduct._table.size)
+-- sProduct = specialProductClass:new({price = "1 billion USD"}, {id = "ABCXFS002-SPECIAL"})
+-- ngx.log(ngx.INFO, utils.toJson(sProduct))
+-- ngx.log(ngx.INFO, sProduct.id)
+-- ngx.log(ngx.INFO, sProduct.asdasdfa)
+-- ngx.log(ngx.INFO, sProduct._table.size)
+-- ngx.log(ngx.INFO, sProduct._table.price)
+
+local cmd = "find `pwd` -name '*.lua'"
+local pfile, err = io.popen(cmd, "r")
+if not pfile then
+    ngx.log(ngx.DEBUG, err or "Can not open directory")
+    return nil, err
+end
+local line = pfile:read('*l')
+while line do
+    ngx.log(ngx.INFO, line)
+    line = pfile:read('*l')
+end
+pfile:close()

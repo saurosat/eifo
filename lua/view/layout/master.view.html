@@ -16,39 +16,33 @@
     <script src="/ApiServices.min.js" defer></script>
     <!-- <script src="https://unpkg.com/alpinejs" defer></script> -->
     <script src="https://cdn.jsdelivr.net/npm/@alpinejs/persist@3.13.8/dist/cdn.min.js" defer></script>
+    <script src="/UIComponents.js" defer></script>
     <script src="/master.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.8/dist/cdn.min.js" defer></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 {%
     local utils = eifo.utils
-    local catVModel = model.rightTables["ProductCategory"]
-    for key, record in pairs(catVModel.keys) do
-        record.childCatIds = {}
-        for i = 1, #record.children, 1 do 
-            local childCatRollup = record.children[i]
-            record.childCatIds[#record.childCatIds + 1] = childCatRollup.productCategoryId 
-            catVModel.keys[childCatRollup.productCategoryId].parentCatId = key
-        end 
-
-        record.productIds = {}
-        for i = 1, #record.catMems, 1 do 
-            local catMem = record.catMems[i]
-            record.productIds[#record.productIds + 1] = catMem.productId 
-        end
-    end
-    local catJson = utils.toJson(catVModel.keys);
-    local topCats = catVModel:select("entity.productCategoryTypeEnumId == 'PctCatalog' and ((not entity.parents) or #(entity.parents) == 0)")
+    local catVModel = model._rightTables["ProductCategory"]
+    local catJson = catVModel:toJson();
+    local topCats = catVModel:select("entity.productCategoryTypeEnumId == 'e.PctCatalog' and not next(entity.parents)")
 
     local store = eifo.store
     local token = store:getSessionToken()
     local storeId = store.storeId
+    local currencyUomId = store.defaultCurrencyUomId or "undefined"
  %}
 
  <script>
     const categories = {* catJson *};
     const sessionToken = "{* token *}";
     const storeId = "{* storeId *}";
+    const currencyUomId = "{* currencyUomId *}"
 </script>
+<style>
+    .pt-180 {
+        padding-top: 720px;
+    }
+</style>
 </head>
 
 <body class="relative">
@@ -98,7 +92,7 @@
                     style="width: 50px;">
                     <option value="cat1" selected>All</option>
 {%  for k = 1, #topCats, 1 do %}
-                    {* topCats[k]:convertTreeToString("<option value='%s' selected>%s</option>", {"key", "categoryName"}, "PctCatalog") *}
+                    {* topCats[k]:convertTreeToString("<option value='%s' selected>%s</option>", {"key", "categoryName"}, "e.PctCatalog") *}
 {%  end %}
                 </select>
             </div>
@@ -114,7 +108,7 @@
             </div>
         </div>
         <div class="order-2 md:order-3 h-10 w-1/2 md:w-40 flex flex-row flex-nowrap justify-end justify-items-end lg:flex lg:items-center">
-            <button x-on:click="$store.global.cartDialogOpen = true" class="bg-transparent">
+            <button x-on:click="$dispatch('open-cart')" class="bg-transparent">
                 <svg class="w-9 h-9 fill-white">
                     <use xlink:href="#cart"></use>
                 </svg>
@@ -178,9 +172,11 @@
     </nav>
 
     <!--Modal Dialogs LOGIN-->
-    <div x-ref="loginDialog" x-data="userLogin" x-init="loadHtml('/components/login', $el)" @open-login.window="open = true" class="absolute top-0 left-0 w-full h-full flex font-sans"
+    <div x-ref="loginDialog" x-data="userLogin" x-init="loadHtml('/components/login', $el)" @open-login.window="open = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
     style="background-color: rgba(0,0,0,.5);" x-show="open"></div>
-
-    \{* blocks.main *}
+    <div x-data="cartDialog($el)" x-init="loadHtml('/components/cart', $el)" @open-cart.window="open = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
+    style="background-color: rgba(0,0,0,.5);" x-show="open"></div>
+    
+    {* main *}
 
 </body>
