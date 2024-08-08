@@ -9,7 +9,7 @@ return function(key, conn)
     end
     local success
     if conn then
-        key = "lock:"..key.."@"..os.time()
+        key = "lock:"..key --.."@"..os.time()
         success = conn:setnx(key, "locked") > 0
     else
         success = ngx.shared.lock:add(key, "locked", 1000) -- expired in 1 second

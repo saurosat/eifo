@@ -2,6 +2,56 @@ local utils = require "eifo.utils"
 
 local recordBaseClass = require "eifo.db.record.Record"
 
+local lTblIndex = function (self, tableName)
+    local parentTbl = self.parent
+    local loadedTbls = parentTbl.tblRegistry
+    local lTbl = loadedTbls[tableName]
+    if not lTbl then
+        lTbl = eifo.db.table[tableName]:new({conn = assert(parentTbl.conn, parentTbl._name..".conn == nil "), tblRegistry = loadedTbls})
+    end
+    lTbl._rightTables[parentTbl._name] = parentTbl
+    self[tableName] = lTbl
+    return lTbl
+end
+local rTblIndex = function (self, tableName)
+    local parentTbl = self.parent
+    local loadedTbls = parentTbl.tblRegistry
+    local rTbl = loadedTbls[tableName]
+    if not rTbl then
+        rTbl = eifo.db.table[tableName]:new({conn = assert(parentTbl.conn, parentTbl._name..".conn == nil "), tblRegistry = loadedTbls})
+    end
+    rTbl._leftTables[parentTbl._name] = parentTbl
+    self[tableName] = rTbl
+    return rTbl
+end
+-- local LTables = setmetatable({}, {
+--     __index = function (self, tableName)
+--         local parentTbl = self.parent
+--         local lTbl = eifo.db.table[tableName]:new({conn = assert(parentTbl.conn, parentTbl._name..".conn == nil ")})
+--         lTbl._rightTables[parentTbl._name] = parentTbl
+--         self[tableName] = lTbl
+--         return lTbl
+--     end
+-- })
+-- function LTables:new(parentTable)
+--     self.__index = self
+--     return setmetatable({parent = parentTable}, self)
+-- end
+
+-- local RTables = setmetatable({}, {
+--     __index = function (self, tableName)
+--         local parentTbl = self.parent
+--         local rTbl = eifo.db.table[tableName]:new({conn = assert(parentTbl.conn, parentTbl._name..".conn == nil ")})
+--         rTbl._leftTables[parentTbl._name] = parentTbl
+--         self[tableName] = rTbl
+--         return rTbl
+--     end
+-- })
+-- function RTables:new(parentTable)
+--     self.__index = self
+--     return setmetatable({parent = parentTable}, self)
+-- end
+
 local _table = utils.ArraySet:new({_p_kSep = '.', _k_kSep = '+'})
 _table._attach = utils.observable._attach
 _table._detach = utils.observable._detach
@@ -13,17 +63,12 @@ end
 function _table:new(tableInfo)
     tableInfo = tableInfo or {}
     local tbl = {
-        __keys = {},
         key = tableInfo.key,
-        _level = 0,
-        maxLevel = tableInfo.maxLevel or 100,
         recordCommons = tableInfo.commonData or {},
-        tableCommons = {skippedTables = tableInfo.skippedTables},
-        --columns = columns or nil,
-        filters = tableInfo.filters or {},
-        skippedTables = utils.ArraySet:new(),
-        initialized = false,
-        groupBy = {}
+        groupBy = {},
+        conn = tableInfo.conn or nil,
+        tblRegistry = tableInfo.tblRegistry or {},
+        __keys = {} --> overwrite ArraySet.__keys
     }
     if not self._name then
         tbl._name = assert(tableInfo.name, "table name is missing in table schema")
@@ -42,48 +87,28 @@ function _table:new(tableInfo)
         tbl._fnIds = utils.ArraySet:new(fnIds)
     end
 
-    if(tableInfo.skippedTables) then
-        tbl.skippedTables = utils.ArraySet:new()
-        for i = 1, #tableInfo.skippedTables, 1 do
-            tbl.skippedTables:add(tableInfo.skippedTables[i])
-        end
-    end
+    tbl._leftTables = setmetatable({parent = tbl}, {__index = lTblIndex})
     if not self._leftCols then
         tbl._leftCols = assert(tableInfo.fnFKs, "fnFKs is missing in table schema")
-    elseif tableInfo.leftColumns then
-        local cols = {}
-        for i = 1, #tableInfo.leftColumns, 1 do
-            local colName = tableInfo.leftColumns[i]
-            assert(self._leftCols[colName], 
-                "Table "..self._name.." does not have FK relationship at field "..colName)
-            cols[colName] = utils.clone(self._leftCols[colName]) -- need clone because this is an object
-        end
-        tbl._leftCols = cols
+    else
+        for colName, _ in pairs(self._leftCols) do
+            tbl.groupBy[colName] = {}
+        end    
     end
+
+    tbl._rightTables = setmetatable({parent = tbl}, {__index = rTblIndex})
     if not self._rightCols then
         tbl._rightCols = {}
-    elseif tableInfo.rightColumns then
-        local rColInfos = tableInfo.rightColumns
-        local cols = {}
-        for key, value in pairs(rColInfos) do
-            local alias, joinInfo
-            if type(value) == "table" then
-                alias = key
-                joinInfo = value
-            else
-                alias = value
-                joinInfo = nil
-            end
-            assert(self._rightCols[alias], 
-                "Table "..self._name.." does not have FK relationship at field "..alias)
-            cols[alias] = {table.unpack(self._rightCols[alias])}
-        end
-        tbl._rightCols = cols
     end
     tbl.toJsonColumns = tableInfo.toJsonColumns
     tbl = self:extend(tbl)
+    tbl.tblRegistry[tbl._name] = tbl
+    ngx.log(ngx.DEBUG, "Created new table "..tbl._name)
     return tbl
 end
+-- function _table:init() 
+--     --TODO to be deleted
+-- end
 function _table:equal(anotherSchema)
     return anotherSchema and (anotherSchema == self or 
             (self.key and anotherSchema.key == self.key) or 
@@ -98,86 +123,6 @@ function _table:setMetaValue(key, value)
     local meta = getmetatable(self)
     meta[key] = value
 end
-
-function _table:init(tableRegistry, direction)
-    if self.initialized then
-        --ngx.log(ngx.DEBUG, "Table "..self._name.." had been inititalized")
-        return -- Do nothing
-    end
-    self.initialized = true
-    if not tableRegistry then
-        tableRegistry = {}
-        tableRegistry[self._name] = self
-    end
-    ngx.log(ngx.DEBUG, "Initializing "..self._name..". leftCols = "..utils.toJson(self._leftCols)..", rightCols = "..utils.toJson(self._rightCols))
-    self._leftTables = {}
-    self._rightTables = {}
-
-
-    local newLTables = {}
-    local newRTables = {}
-    local metaLeftTables = self:getMetaValue("_leftTables")
-    for colName, joinInfo in pairs(self._leftCols) do
-        if not self.groupBy[colName] then
-            self.groupBy[colName] = {}
-        end
-        local tblName, alias = joinInfo[1], joinInfo[2]
-        if not self.skippedTables:index(tblName) then
-            local lTbl = self._leftTables[tblName]
-            if not lTbl then
-                lTbl = tableRegistry[tblName]
-                if not lTbl then
-                    local metaTbl = assert(metaLeftTables and metaLeftTables[tblName], "Relation of "..self._name.." with Left Table "..tblName.." is not initialized")
-                    lTbl = metaTbl:new(self.tableCommons)
-                    newLTables[#newLTables+1] = lTbl
-                    tableRegistry[lTbl._name] = lTbl
-                end
-                self._leftTables[tblName] = lTbl
-            end
-            if not metaLeftTables then
-                lTbl._rightCols[alias] = {self._name, colName}
-            end
-            if not lTbl._rightTables[self._name] then
-                lTbl._rightTables[self._name] = self;
-            end
-        end
-    end
-
-    if not direction or direction == -1 then
-        local metaRightTables = self:getMetaValue("_rightTables")
-        if metaRightTables then
-            for alias, joinInfo in pairs(self._rightCols) do
-                local tblName, colName = joinInfo[1], joinInfo[2]
-                if not self.skippedTables:index(tblName) then
-                    ngx.log(ngx.DEBUG, "Initializing right relations for "..self._name..": colName="..colName..", tblName"..tblName..", alias="..alias)
-                    local rTbl = self._rightTables[tblName]
-                    if not rTbl then
-                        rTbl = tableRegistry[tblName]
-                        if not rTbl then
-                            local metaTbl = assert(metaRightTables[tblName], "Relation of "..self._name.." with Right Table "..tblName.." is not inititalized")
-                            rTbl = metaTbl:new(self.tableCommons)
-                            tableRegistry[tblName] = rTbl
-                            newRTables[#newRTables+1] = rTbl
-                        end
-                        self._rightTables[tblName] = rTbl
-                    end
-                    if not rTbl._leftTables[self._name] then
-                        rTbl._leftTables[self._name] = self 
-                    end
-                end
-            end
-        end
-    end
-    for i = 1, #newLTables, 1 do
-        newLTables[i]:init(tableRegistry, 1)
-        ngx.log(ngx.DEBUG, "Initialized left table "..newLTables[i]._name.." for "..self._name)
-    end
-    for i = 1, #newRTables, 1 do
-        newRTables[i]:init(tableRegistry, -1)
-        ngx.log(ngx.DEBUG, "Initialized right table "..newRTables[i]._name.." for "..self._name)
-    end
-ngx.log(ngx.DEBUG, "Initialized "..self._name..". leftCols = "..utils.toJson(self._leftCols)..", rightCols = "..utils.toJson(self._rightCols))
-end
 function _table:generateKey(recordData)
     if recordData.key then
         --ngx.log(ngx.DEBUG, "Key already exists: "..recordData.key)
@@ -189,11 +134,11 @@ function _table:generateKey(recordData)
     local key
     if #recordData > 0 then
         local ids = recordData
-        key = self._prefix..self._p_kSep..assert(ids[1], self._name..": Missing ID field "..fnIds[1])
+        key = self._prefix..self._p_kSep..ids[1]
         for i = 2, #fnIds, 1 do
             key = key..sep..assert(ids[i], "Missing ID field "..fnIds[i])
         end
-        ngx.log(ngx.DEBUG, key)
+        --ngx.log(ngx.DEBUG, key)
 
     else
         key = self._prefix..self._p_kSep..assert(recordData[fnIds[1]], self._name.."Missing ID field "..fnIds[1].." ID fields: "..utils.toJson(fnIds))
@@ -201,83 +146,47 @@ function _table:generateKey(recordData)
             key = key..sep..assert(recordData[fnIds[i]], "Missing ID field"..fnIds[i])
         end
     end
-    ngx.log(ngx.DEBUG, key)
+    --ngx.log(ngx.DEBUG, key)
 
     return key
 end
 function _table:newRecord(recordData)
     return self._record:new(self, recordData)
 end
-function _table:getRecord(key, conn)
-    if not key then
-        return nil
-    end
-    local record = self:keys(key)
-    if not record and conn then
-        return self:load(key, conn)
-    end
-    return record
-end
 function _table:addRecordCommon(key, value)
     self.recordCommons[key] = value
 end
-function _table:load(recordData, conn, nowEpoch, direction)
-    nowEpoch = nowEpoch or os.time()
-    local recordKey = self:generateKey(recordData)
-    --ngx.log(ngx.DEBUG, recordKey)
-    local record = self:keys(recordKey)
+function _table:loadByKey(recordKey, nowEpoch)
+    local record, err = self:keys(recordKey), nil
     if record then
         return record
     end
-    if self._level >= self.maxLevel then
-        ngx.log(ngx.DEBUG, "max deep level reached: self._level = "..self._level)
-        return record
-    end
-    ngx.log(ngx.DEBUG, self._name.." loading key "..recordKey)
-    self._level = self._level + 1
+    --ngx.log(ngx.DEBUG, self._name.." loading key "..recordKey)
+    local conn = self.conn
     record = self._record:new(self, {key = recordKey})
-    local record, err = record:load(conn)
+    record, err = record:load(conn)
     if not record then
-        self._level = self._level - 1
-        return nil, "Record not found: "..utils.toJson(recordData)
+        local errMsg = "Record not found: "..recordKey..(err and ": "..err or "")
+        ngx.log(ngx.DEBUG, errMsg)
+        return nil, err
     end
+
+    --> Remove expired records
+    nowEpoch = nowEpoch or os.time()
     local thruEpoch = record.thruDate and utils.timeFromDbStr(record.thruDate)
     if thruEpoch and thruEpoch < nowEpoch then
         record:delete(conn)
-        self._level = self._level - 1
         return nil, "Record is expired: "..utils.toJson(record)
     end 
 
     self:add(record)
-
-    local leftCols = self._leftCols
-    for colName, joinInfo in pairs(leftCols) do
-        local tblName = assert(joinInfo[1])
-        if record[colName] and not self.skippedTables:index(tblName) then
-            local tbl = assert(self._leftTables[tblName])
-            local lRecord = tbl:load({key = record[colName]}, conn, nowEpoch, 1)
-            -- if not lRecord then
-            --     record[colName] = nil
-            -- end
-        end
-    end
-
-    if not direction or direction == -1 then
-        local rightCols = self._rightCols
-        for alias, joinInfo in pairs(rightCols) do
-            local tblName, colName = assert(joinInfo[1]), assert(joinInfo[2])
-            if not self.skippedTables:index(tblName) then
-                local tbl = assert(self._rightTables[tblName], self._name.."'s right table is not initiated: "..tblName)
-                tbl:loadByFk(colName, record.key, conn, nowEpoch, -1)
-            end
-        end
-    end
-
-    self._level = self._level - 1
-    if self.onLoaded and self._level == 0 then
+    if self.onLoaded then
         self:onLoaded(record)
     end
     return record
+end
+function _table:load(recordData, nowEpoch)
+    return self:loadByKey(self:generateKey(recordData))
 end
 function _table:getLeftRelKey(columnName, leftRecordKey)
     return self._prefix..self._p_kSep..columnName..self._p_kSep..leftRecordKey
@@ -287,38 +196,43 @@ function _table:getRightRelKey(joinAlias, leftRecordKey)
     local tbl = self._rightTables[joinInfo[1]]
     return tbl:getLeftRelKey(joinInfo[2], leftRecordKey)
 end
-function _table:loadByFk(fKeyColumn, fKeyValue, conn, nowEpoch, direction)
+function _table:loadByFk(fKeyColumn, fKeyValue, nowEpoch)
+    --ngx.log(ngx.DEBUG, self._name..":loadByFk "..fKeyColumn.."= "..fKeyValue)
     if not self.groupBy[fKeyColumn] then
         local msg = "Column "..fKeyColumn.." is not a foreign key"
         ngx.log(ngx.ERR, msg)
         return nil, msg
     end
     local group = self.groupBy[fKeyColumn][fKeyValue]
-    if group then
-        ngx.log(ngx.DEBUG, "Already loaded: loadByFk "..fKeyColumn.."= "..fKeyValue)
+    if not group then
+        group = utils.ArraySet:new()
+        self.groupBy[fKeyColumn][fKeyValue] = group
+    end
+    if group.isLoadedAll then
+        --ngx.log(ngx.DEBUG, "Already loaded: loadByFk "..fKeyColumn.."= "..fKeyValue)
         return group
     end
-    self.groupBy[fKeyColumn][fKeyValue] = utils.ArraySet:new()
-    group = self.groupBy[fKeyColumn][fKeyValue]
+    group.isLoadedAll = true
 
     nowEpoch = nowEpoch or os.time()
 
-    self._level = self._level + 1
     local relkey = self:getLeftRelKey(fKeyColumn, fKeyValue)
+    local conn = assert(self.conn, self._name.." has no connection")
     local keys = conn:sgetall(relkey)
     if not keys then
-        ngx.log(ngx.DEBUG, "loadByFk: Key not found "..fKeyColumn.."= "..fKeyValue)
+        ngx.log(ngx.DEBUG, "FK not found "..fKeyColumn.."= "..fKeyValue)
         self._level = self._level - 1
         return group
     end
     for i = 1, #keys, 1 do
-        local record = self:load({key = keys[i]}, conn, nowEpoch, direction)
+        local record, loadErr = self:loadByKey(keys[i], nowEpoch)
         if record then
             group:add(record)
+        else
+            ngx.log(ngx.DEBUG, "Key not found :"..keys[i])
         end
     end
-    self._level = self._level - 1
-    if self.onLoaded and self._level == 0 then
+    if self.onLoaded then
         self:onLoaded(table.unpack(group))
     end
     return group

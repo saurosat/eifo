@@ -2,9 +2,6 @@ local utils = require "eifo.utils"
 
 local _record = {className = "Record"}
 
-local function __equal(self, otherRecord)
-    return self.key == otherRecord.key
-end
 local function __getByKey(self, sKey)
     --ngx.log(ngx.DEBUG, "Querying key = "..key)
     local meta = getmetatable(self)
@@ -30,36 +27,28 @@ local function __getByKey(self, sKey)
             return ids
         end
 
-        local recordCommons = _table.recordCommons
-        --ngx.log(ngx.DEBUG, utils.toString(recordCommons))
-        if recordCommons and recordCommons[sKey] then
-            return recordCommons[sKey]
+        local common = _table.recordCommons
+        if common and common[sKey] then
+            return common[sKey]
         end
     
         local rightInfo = _table._rightCols[sKey]
         if rightInfo then
             local rTable = _table._rightTables[rightInfo[1]] --> rightInfo[1] is table name
-            if not rTable then
-                ngx.log(ngx.DEBUG, rightInfo[1].." rTable is nil: "..sKey)
-                return nil
+            if rTable then
+                local groupBy = rTable.groupBy[rightInfo[2]] --> rightInfo[2] is joined column name
+                --ngx.log(ngx.DEBUG, rTable._name..".groupBy["..rightInfo[2].."]["..self.key.."] = "..(groupBy and utils.toJson(groupBy[self.key]) or "nil"))
+                return groupBy and groupBy[self.key] or nil
             end
-            local colGroup = rTable.groupBy[rightInfo[2]] --> rightInfo[2] is joined column name
-            if not colGroup then
-                ngx.log(ngx.DEBUG, "Table "..rightInfo[1]..", column "..rightInfo[2]..": groupBy is nil: "..sKey)
-                return nil
-            end
-            local group = colGroup[self.key]
-            if group and group.isLoadedAll then
-                return group
-            end
-            return rTable:loadByFk(rightInfo[2], self.key)
         end
-
-        local fkColName = (string.match(sKey, "Obj$") and sKey:sub(1, -4)) or sKey.."Id"
-        local leftInfo = _table._leftCols[fkColName]
+        local fkKey = (string.match(sKey, "Obj$") and sKey:sub(1, -4)) or sKey.."Id"
+        local leftInfo = _table._leftCols[fkKey]
         if leftInfo then
             local lTable = _table._leftTables[leftInfo[1]]
-            return lTable and lTable:loadByKey(self[fkColName])
+            if lTable then
+                return lTable:keys(self[fkKey])
+            end
+            return nil
         end
     end
     if string.sub(sKey, 1,3) ~= "get" then
@@ -119,8 +108,7 @@ function _record:new(tableObj, recordData)
     else
         error("invalid datatype: "..dataType..". Only hash, array and string is supported")
     end
-    
-    local _mt = self:createSubClass({ _table = tableObj, __index = __getByKey, __eq = __equal, isLoaded = false})
+    local _mt = self:createSubClass({ _table = tableObj, __index = __getByKey})
     return setmetatable(record, _mt)
 end
 function _record:getMetaValue(key, raw)
@@ -315,15 +303,13 @@ local function notifyAll(records, observers, oldVals, newVals)
         ngx.log(ngx.DEBUG, "Receiver: "..utils.toString(v, ": ", "\r\n"))
         v:_update(records, oldVals, newVals)
     end
-    local record = records[1]
-    local leftTables = record._table._leftTables
-    local leftCols = record._table._leftCols
-    for colName, tblName in pairs(leftCols) do
-        if string.sub(colName, -2) == "Id" then
-            local lRecord = record[string.sub(colName, 1, -3)]
-            local lTbl = leftTables[tblName]
-            local leftObservers = lTbl._observers
-            notifyAll({lRecord, table.unpack(records)}, leftObservers, oldVals, newVals)
+    local leftTables = records[1]._table._leftTables
+    for _, tbl in pairs(leftTables) do
+        local leftObservers = tbl._observers
+        if #tbl > 0 and leftObservers and next(leftObservers) then
+            for i = 1, #tbl, 1 do
+                notifyAll({tbl[i], table.unpack(records)}, leftObservers, oldVals, newVals)
+            end
         end
     end
 end

@@ -32,13 +32,13 @@ function _view:new(paths, viewFile)
     local tableDef = viewInfo.tableDef 
                     or assert(viewInfo.tableName and eifo.db.table[viewInfo.tableName])
     view.table = tableDef:new({
-        leftColumns = viewInfo.leftColumns,
-        rightColumns = viewInfo.rightColumns,
-        skippedTables = viewInfo.skippedTables,
+        -- leftColumns = viewInfo.leftColumns,
+        -- rightColumns = viewInfo.rightColumns,
+        -- skippedTables = viewInfo.skippedTables,
         toJsonColumns = viewInfo.toJsonColumns,
     })
     view.name = paths[#paths]
-    view.loadData = viewInfo.loadData
+    --view.loadData = viewInfo.loadData
     view.layout = viewInfo.layout
     view.layoutUri = viewInfo.layoutUri
     view.key = viewInfo.key
@@ -91,11 +91,6 @@ _view._update = function(self, records, oldVals, newVals) --TODO:
     if lockObj then
         os.remove(outFile) --> the updater should remove this lock
     end
-    local outFile = self:getOutFile(record.key)
-    local lockObj = lock(outFile)
-    if lockObj then
-        os.remove(outFile) --> the updater should remove this lock
-    end
 
     outFile = self:getOutFile(record.key, true)
     lockObj = lock(outFile)
@@ -114,15 +109,30 @@ _view.process = function(self, params, noLayout)
         return
     end
     conn:connect()
-    local model, key, err = self:loadData(params, conn)
-    conn:disconnect()
-    if not model then
+    -- Start Edited Aug 7
+    --local model, key, err = self:loadData(params, conn)
+    -- conn:disconnect()
+    if self.key then
+        params.key = self.key
+    elseif #params == 1 then
+        params.key = params[1]
+    end
+    if not params or not next(params) then
+        utils.responseError(ngx.HTTP_BAD_REQUEST, "No search params")
+        return
+    end
+    local model = self.table:new({conn = conn})
+    local key = self.table:generateKey(params)
+    ngx.log(ngx.DEBUG, "Loading key "..key)
+    local record, err = model:loadByKey(key)
+    if not record then
         ngx.log(ngx.INFO, err)
         utils.responseError(ngx.HTTP_NOT_FOUND, "Page not found ")
         return
     end
+    -- End Edited Aug 7
 
-    local renderedText = self:render(model, noLayout)
+    local renderedText = self:render(record, noLayout)
     ngx.header.content_type = self.contentType
     ngx.send_headers()
     ngx.print(renderedText)
@@ -130,46 +140,47 @@ _view.process = function(self, params, noLayout)
 
     if self.outPath then
         local outPathFile = self:getOutFile(key, noLayout)
-        local lock = require "eifo.lock"(outPathFile)
-        if lock then -- write renderedText to a static file 
+        local fLock = lock(outPathFile)
+        if fLock then -- write renderedText to a static file 
             local f = assert(io.open(outPathFile, "w"))
             f:write(renderedText)
             f:close()
-            lock:unlock()
+            fLock:unlock()
         end
     end
+    conn:disconnect()
 end
-_view.loadData = function(self, params, conn)
-    local tbl, key
-    if self.key then
-        params = {key = self.key}
-    elseif #params == 1 then
-        params = {key = params[1]}
-    elseif not params or #params == 0 then
-        return nil, nil, "No search params"
-    end
-    if self.table then
-        tbl = self.table:new()
-        tbl:init()
-        key = self.table:generateKey(params)
-        ngx.log(ngx.DEBUG, "Loading key "..key)
-        local record, err = tbl:load({key = key}, conn)
-        if not record then
-            err = err or "No records found. Please check maxLevel setting"
-            return nil, nil, err
-        end
-    end
-    return tbl, key
-end
-_view.render = function(self, model, noLayout)
+-- _view.loadData = function(self, params, conn)
+--     local model, key
+--     if self.key then
+--         params = {key = self.key}
+--     elseif #params == 1 then
+--         params = {key = params[1]}
+--     elseif not params or #params == 0 then
+--         return nil, nil, "No search params"
+--     end
+--     if self.table then
+--         model = self.table:new()
+--         model:init()
+--         key = self.table:generateKey(params)
+--         ngx.log(ngx.DEBUG, "Loading key "..key)
+--         local record, err = model:load({key = key}, conn)
+--         if not record then
+--             err = err or "No records found. Please check maxLevel setting"
+--             return nil, nil, err
+--         end
+--     end
+--     return model, key
+-- end
+_view.render = function(self, record, noLayout)
 
-    model = model or {}
+    record = record or {}
 
-    --ngx.log(ngx.DEBUG, "\r\n\r\n Rendering: \r\n")
+    ngx.log(ngx.DEBUG, "\r\n\r\n Rendering: "..(record and utils.toJson(record) or "record is nil"))
     if self.template then
         local template = require("resty.template")
         local fn = template.compile(self.template, "no-cache")
-        local sHtml = fn({model = model, main = "{* main *}"}) --> main for layout pre-compile
+        local sHtml = fn({record = record, main = "{* main *}"}) --> main for layout pre-compile
         if noLayout or not (self.layoutUri or self.layout) then
             return sHtml
         end
@@ -189,12 +200,12 @@ _view.render = function(self, model, noLayout)
             fnLayout = template.compile(self.layout)
         end
         --ngx.log(ngx.DEBUG, utils.toJson(fnLayout))
-        return fnLayout({main = sHtml, model = model})
+        return fnLayout({main = sHtml, record = record})
     end
     if self.toJson then
-        return self:toJson(model)
+        return self:toJson(record)
     end
-    return model:toJson()
+    return record:toJson()
 end
 
 

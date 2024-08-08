@@ -7,17 +7,14 @@ function record:getParents()
         return parents
     end
     local tbl = self._table
-    local rTbl = tbl._rightTables["ProductCategoryRollup"]
-    if not rTbl then
-        return {}
-    end
     parents = {}
     local rollups = self.rollups or {}
     for i = #rollups, 1, -1 do
-        local parent = tbl:keys(rollups[i].parentProductCategoryId)
+        local rollup = rollups[i]
+        local parent = rollup.parentProductCategory
         if not parent then
-            rollups:remove(rollups[i])
-            rTbl:remove(rollups[i])
+            rollups:remove(rollup)
+            rollup._table:remove(rollup)
         else
             parents[parent.productCategoryTypeEnumId] = parent
         end
@@ -33,19 +30,16 @@ function record:getChildren()
     local tbl = self._table
     if not tbl then
         ngx.log(ngx.ERR, self.className.." record "..utils.toJson(self).." has no associated table")
-    end
-    local rTbl = tbl._rightTables["ProductCategoryRollup"]
-    if not rTbl then
         return {}
     end
     children = {}
     local rollups = self.childRollups or {}
-    local tbl = self._table
     for i = #rollups, 1, -1 do
-        local child = tbl:keys(rollups[i].productCategoryId)
+        local rollup = rollups[i]
+        local child = rollup.productCategory
         if not child then
-            rollups:remove(rollups[i])
-            rTbl:remove(rollups[i])
+            rollups:remove(rollup)
+            rollup._table:remove(rollup)
         else
             local childCatType = child.productCategoryTypeEnumId
             if not children[childCatType] then

@@ -19,7 +19,7 @@ String.prototype.hashCode = function() {
 
 function getHeaders() {
     let ua = Alpine.store('user')
-    let headers = { "Content-Type": "application/json;charset=UTF-8", "store": storeId, "SessionToken": ua.token }
+    let headers = { "Content-Type": "application/json;charset=UTF-8", "store": storeId, "moquiSessionToken": ua.token, "SessionToken" : ua.token, "X-CSRF-Token": ua.token }
     if(ua.apiKey != null) {
         headers["api_key"] = ua.apiKey;
     }
@@ -28,13 +28,7 @@ function getHeaders() {
 function getReqConfig(method) {
     return { headers: getHeaders(), hostname: "localhost", port: "8080", protocol: "http:", method: method }
 }
-function loadHtml(url, containerEle) {
-    if(!url) return;
-    fetch(url)
-        .then((res) => res.text())
-        .then((htmlText) => { containerEle.innerHTML = htmlText;})
-        .catch((error) => {alert(error);});
-}    
+
 // document.addEventListener('alpine:initialized', () => {
 //     alert("initialized");
 // });
@@ -43,7 +37,7 @@ function logout() {
         let userStore = Alpine.store('user');
         userStore.username = '';
         userStore.apiKey = '';
-        userStore.token = '';
+        userStore.token = sessionToken;
     });
 }
 document.addEventListener('alpine:init', () => {
@@ -123,29 +117,35 @@ document.addEventListener('alpine:init', () => {
                     });
         },
         addProduct(product, quantity = 1) {
-            var ua = Alpine.store('user');
-            if(ua.loggedIn) {
-                ProductService.addProductCart(product, getReqConfig("post"))
-                        .then(function (data) {
-                            this.reset();
-                            this.assign(data);
-                        });
-            } else {
-                let pItemIndex = this.orderItemList.findIndex(item => item.productId === product.productId)
-                let pItem = this.orderItemList[pItemIndex]
-                if(pItem) {
-                    pItem.quantity += quantity;
-                    if(pItem.quantity <= 0) {
-                        this.orderItemList.splice(pItemIndex, 1)
-                    }
-                } else {
-                    if(quantity > 0) {
-                        pItem = {...product, quantity: quantity, currencyUomId: currencyUomId, productStoreId: storeId};
-                        this.orderItemList.push(pItem)
-                    }
-                }
-            }
-            alert("Added product " + product.pseudoId);
+            let cart = this;
+            ProductService.addProductCart(product, getReqConfig("post"))
+            .then(function (data) {
+                cart.reset();
+                cart.assign(data);
+            });
+            // var ua = Alpine.store('user');
+            // if(ua.loggedIn) {
+            //     ProductService.addProductCart(product, getReqConfig("post"))
+            //             .then(function (data) {
+            //                 this.reset();
+            //                 this.assign(data);
+            //             });
+            // } else {
+            //     let pItemIndex = this.orderItemList.findIndex(item => item.productId === product.productId)
+            //     let pItem = this.orderItemList[pItemIndex]
+            //     if(pItem) {
+            //         pItem.quantity += quantity;
+            //         if(pItem.quantity <= 0) {
+            //             this.orderItemList.splice(pItemIndex, 1)
+            //         }
+            //     } else {
+            //         if(quantity > 0) {
+            //             pItem = {...product, quantity: quantity, currencyUomId: currencyUomId, productStoreId: storeId};
+            //             this.orderItemList.push(pItem)
+            //         }
+            //     }
+            // }
+            // alert("Added product " + product.pseudoId);
         },
         removeProduct(product, index = -1) {
             let pIndex = index >= 0 ? index : this.orderItemList.findIndex(item => item.productId === product.productId)

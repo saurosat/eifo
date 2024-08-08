@@ -13,6 +13,7 @@
 
 
     <title>Gleecy</title>
+    <script src="/utils.js"></script>
     <script src="/ApiServices.min.js" defer></script>
     <!-- <script src="https://unpkg.com/alpinejs" defer></script> -->
     <script src="https://cdn.jsdelivr.net/npm/@alpinejs/persist@3.13.8/dist/cdn.min.js" defer></script>
@@ -22,13 +23,18 @@
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 {%
     local utils = eifo.utils
-    local catVModel = model._rightTables["ProductCategory"]
-    local catJson = catVModel:toJson();
-    local topCats = catVModel:select("entity.productCategoryTypeEnumId == 'e.PctCatalog' and not next(entity.parents)")
+    local categories = record.categories
+    local catJson = utils.toJson(categories)
+    local topCats = utils.ArraySet:new()
+    for i = 1, #categories, 1 do 
+        if categories[i].productCategoryTypeEnumId == 'e.PctCatalog' and not next(categories[i].parents) then 
+            topCats:add(categories[i])
+        end 
+    end 
 
     local store = eifo.store
     local token = store:getSessionToken()
-    local storeId = store.storeId
+    local storeId = store.productStoreId
     local currencyUomId = store.defaultCurrencyUomId or "undefined"
  %}
 
@@ -172,9 +178,9 @@
     </nav>
 
     <!--Modal Dialogs LOGIN-->
-    <div x-ref="loginDialog" x-data="userLogin" x-init="loadHtml('/components/login', $el)" @open-login.window="open = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
+    <div x-ref="loginDialog" x-data="userLogin" x-init="loadHtml($el, '/components/login')" @open-login.window="open = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
     style="background-color: rgba(0,0,0,.5);" x-show="open"></div>
-    <div x-data="cartDialog($el)" x-init="loadHtml('/components/cart', $el)" @open-cart.window="open = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
+    <div x-data="new Cart($el)" x-init="loadHtml($el, '/components/cart')" @open-cart.window="open = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
     style="background-color: rgba(0,0,0,.5);" x-show="open"></div>
     
     {* main *}

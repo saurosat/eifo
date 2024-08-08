@@ -1,13 +1,13 @@
 <div class="flex flex-col" >
     <ul class="w-1/3 flex-shrink">
-        <li>Category ID: {{model[1].productCategoryId}}</li>
-        <li>Category key: {{model[1].key}}</li>
-        <li>Category name: {{model[1].categoryName}}</li>
-        <li>Pseudo ID: {{model[1].pseudoId}}</li>
+        <li>Category ID: {{record.productCategoryId}}</li>
+        <li>Category key: {{record.key}}</li>
+        <li>Category name: {{record.categoryName}}</li>
+        <li>Pseudo ID: {{record.pseudoId}}</li>
     </ul>
     <div class="w-2/3">
     {%
-        local pcm = model._rightTables["ProductCategoryMember"]
+        local pcm = record.catMems
         for i = 1, #pcm, 1 do 
             local p = pcm[i].product
     %}

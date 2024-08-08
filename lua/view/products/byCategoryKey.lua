@@ -1,21 +1,18 @@
 local utils = require "eifo.utils"
 return {
     tableName = "ProductCategory",
-    leftColumns = {},
-    rightColumns = {"catMems"},
-    skippedTables = {"ProductAssoc"},
     layout = "/layout/master",
     outputFile = false, 
-    toJson = function (self, model)
-        if #model == 0 then
+    toJson = function (self, record)
+        if not record or not next(record) then
             return "{}"
         end
         local json = "{"
-        for k, v in pairs(model[1]) do
+        for k, v in pairs(record) do
             json = json..'"'..k..'": '..utils.toJson(v)..", "
         end
         json = json..'"products": {'
-        local catmems = model._rightTables["ProductCategoryMember"]
+        local catmems = record.catMems
         for i = 1, #catmems, 1 do
             local product = catmems[i].product
             json = json..'"'..product.key..'": '..product:toJson()..", "

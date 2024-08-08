@@ -205,8 +205,8 @@ rwmt.hdel = function(self, key, fields, autocommit)
     return oldVals, nil, curvals
 end
 rwmt.sadd = function(self, key, item, autocommit)
-    if not item then
-        return 0
+    if item == nil then
+        return 0, "adding a nil item"
     end
     local num, err = self.connection:sadd(key, item)
     if not num then
@@ -275,4 +275,5 @@ local connFactory = {
     end
 }
 
+eifo.db.conn = connFactory
 return connFactory

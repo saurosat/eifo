@@ -23,22 +23,32 @@ end
 --ngx.say("Entity Name: "..entityName)
 --ngx.log(ngx.DEBUG, utils.toJson(eifo.db.table))
 
-local tbl = eifo.db.table[entityName]:new({rightColumns = {}})
-if not tbl then
-    utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Entity '" .. entityName .."' has no definition")
-    return
-end
-tbl:init()
-ngx.log(ngx.DEBUG, "Table "..tbl._name..", entityName="..entityName)
-
 local onAction = utils.popKey(reqData, "on")
 local viewableCat = utils.popKey(reqData, "viewable")
 local columnPrefix = utils.popKey(reqData, "columnPrefix")
 local tobeDeleted = utils.popKey(reqData, "delete")
 local storeId = utils.popKey(reqData, "storeId")
 
---ngx.say("Entity prefix: "..ed.prefix)
---utils.printTable(reqData)
+local connFactory = eifo.db.conn
+local conn, errMsg = connFactory.redis()
+if not conn then
+    ngx.log(ngx.CRIT, "Failed to get DB connection "..errMsg)
+    return
+end
+local ok, error = conn:connect()
+if not ok then
+    ngx.log(ngx.ERR, "Cannot get connection: "..(error or "unknown error"))
+    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
+    ngx.print("Cannot connect to local DB: "..(error or "Unknown error."))
+    ngx.eof() -- release http connection
+    return
+end
+local tbl = eifo.db.table[entityName]:new({conn = conn})
+if not tbl then
+    utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Entity '" .. entityName .."' has no definition")
+    return
+end
+ngx.log(ngx.DEBUG, "Table "..tbl._name..", entityName="..entityName)
 local record, err = tbl:newRecord(reqData)
 
 if not record then
@@ -48,35 +58,27 @@ if not record then
 end
 ngx.log(ngx.DEBUG, "record is "..(record and utils.toJson(record) or "NIL"))
 
-ngx.status = ngx.HTTP_OK
-ngx.print("OK!")
-ngx.eof() -- release http connection
-
-local connFactory = eifo.db.conn
-local conn, errMsg = connFactory.redis()
-if not conn then
-    ngx.log(ngx.CRIT, "Failed to get DB connection "..errMsg)
-    return
-end
-local ok, error = conn:connect()
-if ok then
-    conn:incr(lockKey)
-    local currentRecord = tbl:load({key = record.key}, conn)
-    local oldVals, newVals, err = record:persist(conn, tobeDeleted)
-    if err then
-        ngx.log(ngx.ERR, err)
-    else
-        if currentRecord then
-            currentRecord:_notify(oldVals, newVals)
-        else
-            record:_notify(oldVals, newVals)
-        end
-    end
-    local num = conn:decr(lockKey)
-    conn:disconnect()
+conn:incr(lockKey)
+local currentRecord = tbl:load({key = record.key}, conn)
+local oldVals, newVals, err = record:persist(conn, tobeDeleted)
+if err then
+    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
+    ngx.print("Failed to updated: "..err)
+    ngx.eof() -- release http connection
+    ngx.log(ngx.ERR, err)
 else
-    ngx.log(ngx.ERR, "Cannot get connection: "..(error or "unknown error"))
+    ngx.status = ngx.HTTP_OK
+    ngx.print("OK!")
+    ngx.eof() -- release http connection
+    if currentRecord then
+        currentRecord:_notify(oldVals, newVals)
+    else
+        record:_notify(oldVals, newVals)
+    end
 end
+local num = conn:decr(lockKey)
+conn:disconnect()
+
 
 local ipStr = ngx.shared.cluster:get("IPs")
 if ipStr and type(ipStr) == 'string' then

@@ -1,6 +1,30 @@
 {%
-    local product = model[1]
+    local product = record
+    local features = product.selectableFeatures
+    local variants = product.variants
+    local scriptVariants = ""
+    for i = 1, #variants, 1 do 
+        if variants[i] and variants[i] ~= 0 then
+            scriptVariants = scriptVariants.."\t variants["..i.."] = '"..variants[i].productId .."';\n"
+        end
+    end
+    ngx.log(ngx.DEBUG, "scriptVariants = "..scriptVariants)
 %}
+<script>
+    let fTypeIndexes = [];
+    let fIndex= 0;
+    let productId = undefined;
+    let variants = [];
+    {*scriptVariants*}
+
+    function updateFIndex() {
+        fIndex = 0;
+        for(let i = 0; i < fTypeIndexes.length; i++){
+            fIndex += (fTypeIndexes[i] ? fTypeIndexes[i] : 0);
+        }
+        productId = variants[fIndex];
+    }
+</script>
 <section class="py-20 overflow-hidden bg-white font-poppins dark:bg-gray-800">
     <div class="max-w-6xl px-4 py-4 mx-auto lg:py-8 md:px-6">
         <div class="flex flex-wrap -mx-4">
@@ -21,46 +45,32 @@
                                 class="text-base font-normal text-gray-500 line-through dark:text-gray-400">{{product.PppPurchasePptListPrice or ""}}</span>
                         </p>
                     </div>
-                    <div class="mb-8">
-                        <h2 class="mb-2 text-xl font-bold dark:text-gray-400">
-                            Color</h2>
-                        <div class="flex flex-wrap -mb-2">
-                            <button
-                                class="p-1 mb-2 mr-2 border border-transparent rounded-full hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-400 ">
-                                <div class="w-6 h-6 bg-red-600 rounded-full"></div>
-                            </button>
-                            <button
-                                class="p-1 mb-2 mr-2 border border-transparent rounded-full hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-400">
-                                <div class="w-6 h-6 bg-green-600 rounded-full"></div>
-                            </button>
-                            <button
-                                class="p-1 mb-2 border border-transparent rounded-full hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-400">
-                                <div class="w-6 h-6 bg-yellow-500 rounded-full"></div>
-                            </button>
-                            <button
-                                class="p-1 mb-2 border border-transparent rounded-full hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-400">
-                                <div class="w-6 h-6 rounded-full bg-sky-400"></div>
-                            </button>
-                        </div>
-                    </div>
+{%
+    local fTypeIndex = 0
+    for fType, fArray in pairs(features) do  
+        local indexFrom = fArray[0]
+%}
                     <div class="pb-6 mb-8 border-b border-gray-300 dark:border-gray-700">
-                        <h2 class="mb-2 text-xl font-bold dark:text-gray-400">
-                            Size</h2>
+                        <h2 class="mb-2 text-xl font-bold dark:text-gray-400">{*fType.description*}</h2>
                         <div class="flex flex-wrap -mb-2">
-                            <button
-                                class="py-1 mb-2 mr-1 border w-11 hover:border-blue-400 dark:border-gray-400 hover:text-blue-600 dark:hover:border-gray-300 dark:text-gray-400">XL
+    {%
+        for i = 1, #fArray, 1 do
+            local sOnClick = "onclick='fTypeIndexes["..fTypeIndex.."]="..(indexFrom + i).."; updateFIndex();'"
+    %}
+                            <button {*sOnClick*}
+                                class="py-1 mb-2 mr-1 border w-11 hover:border-blue-400 dark:border-gray-400 hover:text-blue-600 dark:hover:border-gray-300 dark:text-gray-400">
+                                {*fArray[i].abbrev*}
                             </button>
-                            <button
-                                class="py-1 mb-2 mr-1 border w-11 hover:border-blue-400 hover:text-blue-600 dark:border-gray-400 dark:hover:border-gray-300 dark:text-gray-400">S
-                            </button>
-                            <button
-                                class="py-1 mb-2 mr-1 border w-11 hover:border-blue-400 hover:text-blue-600 dark:border-gray-400 dark:hover:border-gray-300 dark:text-gray-400">M
-                            </button>
-                            <button
-                                class="py-1 mb-2 mr-1 border w-11 hover:border-blue-400 hover:text-blue-600 dark:border-gray-400 dark:hover:border-gray-300 dark:text-gray-400">XS
-                            </button>
+    {%
+        end
+        fTypeIndex = fTypeIndex + 1
+    %}
                         </div>
                     </div>
+{%
+    end
+%}
+
                     <div class="flex flex-wrap items-center ">
                         <div class="mb-4 mr-4 lg:mb-0">
                             <div class="w-28">
@@ -86,7 +96,7 @@
                         </div>
                         <div class="mb-4 mr-4 lg:mb-0">
                             {% local imageUrl = product:getImageUrls("128x128")[1] or "#"%}
-                            <button onclick="Alpine.store('cartInfo').addProduct({productId: '{*product.productId*}', productName: '{*product.productName*}', image: '{*imageUrl*}', pseudoId: '{*product.pseudoId*}'})"
+                            <button onclick="Alpine.store('cartInfo').addProduct({productId: productId, productName: '{*product.productName*}', image: '{*imageUrl*}', pseudoId: '{*product.pseudoId*}'})"
                                 class="flex items-center justify-center w-full h-10 p-2 text-gray-700 border border-gray-300 lg:w-11 hover:text-gray-50 dark:text-gray-200 dark:border-blue-600 hover:bg-blue-600 hover:border-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 dark:hover:border-blue-500 dark:hover:text-gray-300">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                                     class="bi bi-cart" viewBox="0 0 16 16">
@@ -95,8 +105,8 @@
                                 </svg>
                             </button>
                         </div>
-                        <div class="mb-4 lg:mb-0">
-                            <button
+                        <div x-data="{variants: variants}" class="mb-4 lg:mb-0">
+                            <button x-bind:disabled="!variants[fIndex]"
                                 class="flex items-center justify-center w-full h-10 p-2 text-gray-700 border border-gray-300 lg:w-11 hover:text-gray-50 dark:text-gray-200 dark:border-blue-600 hover:bg-blue-600 hover:border-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 dark:hover:border-blue-500 dark:hover:text-gray-300">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                                     class=" bi bi-heart" viewBox="0 0 16 16">

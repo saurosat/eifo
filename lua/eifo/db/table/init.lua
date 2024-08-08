@@ -47,7 +47,7 @@ local tables = {
         name = "ProductFeatureAppl",
         prefix = "pfa",
         fnIds = {"productId", "productFeatureId", "fromDate"},
-        fnFKs = {applTypeEnumId = {"Enumeration", "featureAppls"}, productId = {"Product", "featureAppls"}, productFeatureId = {"ProductFeature", "featureAppls"}}
+        fnFKs = {applTypeEnumId = {"Enumeration", "productFeatureAppls"}, productId = {"Product", "featureAppls"}, productFeatureId = {"ProductFeature", "productAppls"}}
     },
     {
         name = "ProductCategoryRollup",
@@ -95,16 +95,19 @@ local tables = {
 
 local Table = require "eifo.db.table.Table"
 local tbls = {}
+eifo.db.table = tbls
 for i = 1, #tables, 1 do
     local tbl = Table:new(tables[i])
+    tbl._observers = {} -- set here so that all subclasses share the same observers object
     tbls[tbl._name] = tbl
     --ngx.log(ngx.DEBUG, tables[i].name.." --- "..tbl._name)
 end
 for i = 1, #tables, 1 do
-    tbls[tables[i].name]:init(tbls)
+    local tbl = tbls[tables[i].name]
+    for colName, joinInfo in pairs(tbl._leftCols) do
+        local tblName, alias = joinInfo[1], joinInfo[2]
+        local lTbl = tbls[tblName]
+        lTbl._rightCols[alias] = {tables[i].name, colName}
+    end
 end
-for i = 1, #tables, 1 do
-    ngx.log(ngx.DEBUG, "Table "..tables[i].name..", rightCols "..utils.toJson(tbls[tables[i].name]._rightCols))
-end
-ngx.log(ngx.DEBUG, utils.toJson(utils.keys(tbls["ProductStore"]._rightTables)))
 return tbls

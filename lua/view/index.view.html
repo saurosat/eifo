@@ -1,8 +1,15 @@
 <section>
     {%
         local utils = require "eifo.utils"
-        local promotions = model._rightTables["ProductStorePromotion"]
-        local promoProducts = promotions._rightTables["ProductStorePromoProduct"]
+        local store = assert(record, "record is nil")
+        local promotions = store.promotions
+        local promoProducts = utils.ArraySet:new()
+        for i = 1, #promotions, 1 do 
+            local promoPrds = promotions[i].promoProducts
+            for j = 1, #promoPrds, 1 do 
+                promoProducts:add(promoPrds[i])
+            end
+        end
         local numPromos = #promoProducts
     %}
     <div class="w-full mx-auto relative">
@@ -95,22 +102,27 @@
 
     <div class="bg-transparent mt-5 justify-items-center w-full">
         <div class="bg-transparent justify-center mx-auto w-full gap-6 container grid grid-flow-row grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" >
-            {%
-                local catVModel = model._rightTables["ProductCategory"]
-                local topCats = catVModel:select("entity.productCategoryTypeEnumId == 'e.PctCatalog'")
-                for k = 1, #topCats, 1 do
-                    local cat = topCats[k]
-             %}
+        {%
+            local products = utils.ArraySet:new()
+            local topCats = store.categories
+            for k = 1, #topCats, 1 do
+                local cat = topCats[k]
+                if cat.productCategoryTypeEnumId == 'e.PctCatalog' then
+                    local catMems = cat.catMems
+                    for iP = 1, #catMems, 1 do 
+                        products:add(catMems[iP].product)
+                    end
+        %}
                     {(/category/productCard.view.html, {cat = cat})}
-            {%  end  %}
+        {%      end  
+            end
+        %}
         </div>
     </div>
     <div class="w-full mx-auto relative">
         <div x-data="(new Carousel($el.children[0], false))" class="relative w-full overflow-x-hidden shadow-2xl rounded pt-40">
             <div class="absolute top-0 left-0 h-full bg-green-100 flex transition-transform flex-shrink-0">
         {%  
-            local pcm = catVModel._rightTables["ProductCategoryMember"]
-            local products = pcm._leftTables["Product"]
             local num = #products
             for i = 1, num, 1 do 
                 local product = products[i]

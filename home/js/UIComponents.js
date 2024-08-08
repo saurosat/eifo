@@ -15,6 +15,9 @@ class Closable {
         this.open = false;
         if(this.button) this.button.focus();
     }
+    getResultCode() {
+        return 0;
+    }
 }
 class Cart extends Closable {
     constructor(dialog = null, button = null) {
@@ -131,4 +134,38 @@ class Carousel {
         }
     }
 
+}
+
+class Wizard {
+    constructor() {
+        
+        /** 
+         * Result values the previous steps. Whenever a step done, its container html must be closed
+         * and an integer value should be append to this proderty
+         **/
+        this.resultCodes = [0]; 
+
+        /**
+         * A map with key is the result code of previous step and value is the next step needed to be
+         * done for that result
+         */
+        this.steps = [];
+    }
+    next() {
+        let results = this.resultCodes;
+        let nextStep = this.steps[results[results.length - 1]];
+        if(nextStep) {
+            nextStep.open();
+        }
+    }
+    addStep(closableDlg, resultCode) {
+        let self = this;
+        closableDlg.__super_close = closableDlg.close;
+        closableDlg.close = function() {
+            closableDlg.__super_close();
+            self.resultCodes[self.resultCodes.length] = closableDlg.getResultCode();
+            self.next();
+        };
+        this.steps[resultCode] = closableDlg;
+    }
 }

@@ -12,37 +12,43 @@ local bit = require("bit")
 
 local store = utils.newTable(0, 12)
 store.load = function(self)
-    local storeTable = eifo.db.table.ProductStore:new({rightCols = {}})
     local conn = eifo.db.conn.redis()
     conn:connect()
-    self.record = storeTable:load({key = self.storeId}, conn)
+    local storeTable = eifo.db.table.ProductStore:new({conn = conn})
+    local record = storeTable:load({key = self.storeId}, conn)
     conn:disconnect()
-    if self.record then
-        self.secretKey = self.record["secretKey"]
+    if record then
+        for k, v in pairs(record) do
+            self[k] = v
+        end
     end
     if not self.secretKey then
         self.secretKey = eifo.secretKey
     end
     -- ngx.log(ngx.INFO, "Secret key ="..self.secretKey)
     self.hashValue = self:hash(self.secretKey)
-    self.hashValue = self:hash(self.storeId)
+    self.hashValue = self:hash(self.storeId:sub(7))
     self.isLoaded = true
 end
 store.getSessionToken = function(self)
-    return string.format("%08x", self:hash(self:getClientIp()))
+    local clientIp = self:getClientIp()
+    ngx.log(ngx.DEBUG,  "Client IP = "..clientIp)
+    return string.format("%08x", self:hash(clientIp))
 end
 store.getSignature = function(self, message)
     return string.format("%08x", self:hash(message))
 end
 
 store.hash = function(self, msg)
+    ngx.log(ngx.DEBUG, "msg = "..msg)
     local bytes = {string.byte(msg, 1, -1)}
     local h = self.hashValue
     -- ngx.log(ngx.DEBUG, "Self hash value = "..h)
     -- ngx.log(ngx.DEBUG, "num bytes = "..tostring(#bytes))
     for i = 1, #bytes, 1 do
-        local bits = bytes[i]
-        h = bit.band(bit.lshift(h, 4) + (h*15) + bits, 0x7fffffff)
+        local bits = tonumber(bytes[i])
+        h = bit.band(h*31 + bits, 0x7fffffff)
+        -- ngx.log(ngx.DEBUG, "round "..tostring(i)..": bits = "..tostring(bits)..", h = "..tostring(h))
         -- ngx.log(ngx.DEBUG, "bytes = "..string.format("%x", bits).."; hash = "..string.format("%x", h))
     end
     --h = bit.band(h, 0x8fffffff)

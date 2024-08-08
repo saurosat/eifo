@@ -13,8 +13,8 @@ end})
 eifo._lazyObjs = {}
 eifo._lazyObjs["store"] = require "eifo.store"
 
-eifo.db.conn = require "eifo.db.conn"
-eifo.db.table = require "eifo.db.table.init"
+require "eifo.db.conn"
+require "eifo.db.table.init"
 
 local viewClass = require "eifo.view"
 local viewPath = eifo.basePath.."/lua/view"
