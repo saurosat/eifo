@@ -7,7 +7,8 @@ local lTblIndex = function (self, tableName)
     local loadedTbls = parentTbl.tblRegistry
     local lTbl = loadedTbls[tableName]
     if not lTbl then
-        lTbl = eifo.db.table[tableName]:new({conn = assert(parentTbl.conn, parentTbl._name..".conn == nil "), tblRegistry = loadedTbls})
+        local tblClass = assert(eifo.db.table[tableName], tableName.." table definition is not found")
+        lTbl = tblClass:new({conn = assert(parentTbl.conn, parentTbl._name..".conn == nil "), tblRegistry = loadedTbls})
     end
     lTbl._rightTables[parentTbl._name] = parentTbl
     self[tableName] = lTbl
@@ -157,6 +158,9 @@ function _table:addRecordCommon(key, value)
     self.recordCommons[key] = value
 end
 function _table:loadByKey(recordKey, nowEpoch)
+    if not recordKey then
+        return nil, "recordKey is nil"
+    end
     local record, err = self:keys(recordKey), nil
     if record then
         return record
@@ -221,7 +225,6 @@ function _table:loadByFk(fKeyColumn, fKeyValue, nowEpoch)
     local keys = conn:sgetall(relkey)
     if not keys then
         ngx.log(ngx.DEBUG, "FK not found "..fKeyColumn.."= "..fKeyValue)
-        self._level = self._level - 1
         return group
     end
     for i = 1, #keys, 1 do

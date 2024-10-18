@@ -1,8 +1,5 @@
 return {
     tableName = "ProductStore",
-    key = "store.P56586a9f100000",
-    leftColumns = {},
-    rightColumns = {"categories"},
-    skippedTables = {"ProductAssoc", "ProductCategoryMember"},
+    key = "store.p56586a9f100000",
     outputFile = true
 }

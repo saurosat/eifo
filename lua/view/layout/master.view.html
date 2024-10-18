@@ -9,18 +9,23 @@
     <meta name="keywords" content="clothes, cross border, VN, Vietnam, Viet Nam, US, America">
 
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Work+Sans:200,400&display=swap">
-    <link rel="stylesheet" href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <link rel="stylesheet" href="/gleecy-tailwind.css" />
 
 
     <title>Gleecy</title>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://www.paypal.com/sdk/js?components=buttons&intent=authorize&client-id=AcdrYvOADBR9Bxhr7BtOIRDwwfhEOLdMHvvt89lTqxGdx_n6t9r5HdU6O4jn4qv1aSX0azdbw6TJA9wO"></script>
+    <script src="/ApiServices.min.js"></script>
     <script src="/utils.js"></script>
-    <script src="/ApiServices.min.js" defer></script>
+    <script src="/UIComponents.js" defer></script>
     <!-- <script src="https://unpkg.com/alpinejs" defer></script> -->
     <script src="https://cdn.jsdelivr.net/npm/@alpinejs/persist@3.13.8/dist/cdn.min.js" defer></script>
-    <script src="/UIComponents.js" defer></script>
     <script src="/master.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.8/dist/cdn.min.js" defer></script>
-    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+        <!-- To be replaced with your own stylesheet -->
+    <!-- <link rel="stylesheet" type="text/css" href="https://www.paypalobjects.com/webstatic/en_US/developer/docs/css/cardfields.css"/> -->
+
 {%
     local utils = eifo.utils
     local categories = record.categories
@@ -37,25 +42,23 @@
     local storeId = store.productStoreId
     local currencyUomId = store.defaultCurrencyUomId or "undefined"
  %}
-
  <script>
     const categories = {* catJson *};
     const sessionToken = "{* token *}";
     const storeId = "{* storeId *}";
     const currencyUomId = "{* currencyUomId *}"
+
+    // Render the button component
+    
+
 </script>
-<style>
-    .pt-180 {
-        padding-top: 720px;
-    }
-</style>
 </head>
 
 <body class="relative">
     <svg class="hidden" xmlns="http://www.w3.org/2000/svg">
         <style>
             path {
-                fill: lightgray;
+                fill: rgb(31 41 55 / var(--tw-text-opacity)) ;
             }
         </style>
         <symbol id="search" viewBox="0 0 24 24">
@@ -178,11 +181,13 @@
     </nav>
 
     <!--Modal Dialogs LOGIN-->
-    <div x-ref="loginDialog" x-data="userLogin" x-init="loadHtml($el, '/components/login')" @open-login.window="open = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
-    style="background-color: rgba(0,0,0,.5);" x-show="open"></div>
-    <div x-data="new Cart($el)" x-init="loadHtml($el, '/components/cart')" @open-cart.window="open = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
-    style="background-color: rgba(0,0,0,.5);" x-show="open"></div>
-    
+    <div x-ref="loginDialog" x-data="userLogin($el, '/components/login')" @open-login.window="isOpen = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
+    style="background-color: rgba(0,0,0,.5);" x-show="isOpen"></div>
+    <div x-data="cartDialog($el, 'paypal-button-container')" @open-cart.window="isOpen = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
+        style="background-color: rgba(0,0,0,.5);" x-show="isOpen">
+        {(/components/cart)}
+    </div>
+    <!-- loadHtml($el, '/components/cart').then(()=>{paypalBtn.render('#paypal-button-container');})-->
     {* main *}
 
 </body>

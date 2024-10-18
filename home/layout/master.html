@@ -9,37 +9,40 @@
     <meta name="keywords" content="clothes, cross border, VN, Vietnam, Viet Nam, US, America">
 
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Work+Sans:200,400&display=swap">
-    <link rel="stylesheet" href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <link rel="stylesheet" href="/gleecy-tailwind.css" />
 
 
     <title>Gleecy</title>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://www.paypal.com/sdk/js?components=buttons&intent=authorize&client-id=AcdrYvOADBR9Bxhr7BtOIRDwwfhEOLdMHvvt89lTqxGdx_n6t9r5HdU6O4jn4qv1aSX0azdbw6TJA9wO"></script>
+    <script src="/ApiServices.min.js"></script>
     <script src="/utils.js"></script>
-    <script src="/ApiServices.min.js" defer></script>
+    <script src="/UIComponents.js" defer></script>
     <!-- <script src="https://unpkg.com/alpinejs" defer></script> -->
     <script src="https://cdn.jsdelivr.net/npm/@alpinejs/persist@3.13.8/dist/cdn.min.js" defer></script>
-    <script src="/UIComponents.js" defer></script>
     <script src="/master.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.8/dist/cdn.min.js" defer></script>
-    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+        <!-- To be replaced with your own stylesheet -->
+    <!-- <link rel="stylesheet" type="text/css" href="https://www.paypalobjects.com/webstatic/en_US/developer/docs/css/cardfields.css"/> -->
 
  <script>
-    const categories = [{"productCategoryId":"P56586a9f100153","key":"pc.P56586a9f100153","pseudoId":"US-MI","ownerPartyId":"100000","lastUpdatedStamp":"2024-05-06 17:42","storeCategoryTypeEnumId":"PsctViewAllow","categoryName":"To be sell in US-MI","fromDate":"2024-05-01 00:00","isLoaded":true,"productStoreId":"store.P56586a9f100000","version":"3","productCategoryTypeEnumId":"e.PctInventoryGroup",}, {"productCategoryId":"P56586a9f100052","key":"pc.P56586a9f100052","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"AOD","parentCategories":"APP","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:41","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Áo dài","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"9",}, {"productCategoryId":"P56586a9f100053","key":"pc.P56586a9f100053","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"HAT","parentCategories":"APP","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:41","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Mũ - Nón","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"10",}, {"productCategoryId":"P56586a9f100006","key":"pc.P56586a9f100006","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"SHO","parentCategories":"APP","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:41","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Short","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"3",}, {"productCategoryId":"P56586a9f100005","key":"pc.P56586a9f100005","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"BRA","parentCategories":"UND","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:41","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Bra","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"1",}, {"productCategoryId":"P56586a9f100001","key":"pc.P56586a9f100001","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"UND","parentCategories":"APP","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:41","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Underwear","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"2",}, {"productCategoryId":"P56586a9f100004","key":"pc.P56586a9f100004","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"BIK","parentCategories":"SPO","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:41","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Bikini","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"1",}, {"productCategoryId":"P56586a9f100000","key":"pc.P56586a9f100000","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"SPO","parentCategories":"APP","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:41","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Sport wear","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"1",}, {"productCategoryId":"P56586a9f100003","key":"pc.P56586a9f100003","pseudoId":"APP","ownerPartyId":"100000","description":"Imported from CSV","lastUpdatedStamp":"2024-05-25 16:41","fromDate":"2024-05-01 00:00","categoryName":"Apparel","storeCategoryTypeEnumId":"PsctBrowseRoot","isLoaded":true,"productStoreId":"store.P56586a9f100000","version":"3","productCategoryTypeEnumId":"e.PctCatalog",}, {"productCategoryId":"P56586a9f100018","key":"pc.P56586a9f100018","parentCategories":"_NA_","productCategoryTypeEnumId":"e.PctUsage","fromDate":"2024-05-01 00:00","ownerPartyId":"100000","lastUpdatedStamp":"2024-05-08 20:58","storeCategoryTypeEnumId":"PsctFeatured","categoryName":"Children","pseudoId":"CHI","isLoaded":true,"productStoreId":"store.P56586a9f100000","description":"Imported from CSV","version":"3",}, {"productCategoryId":"P56586a9f100013","key":"pc.P56586a9f100013","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"GCBR","parentCategories":"GLU","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:54","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Glucosamin and Chondroitin with MSM & Burdock Root","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"3",}, {"productCategoryId":"P56586a9f100014","key":"pc.P56586a9f100014","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"GCT","parentCategories":"GLU","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:54","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Glucosamin and Chondroitin with MSM & Turmeric","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"2",}, {"productCategoryId":"P56586a9f100015","key":"pc.P56586a9f100015","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"GCBL","parentCategories":"GLU","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:54","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Glucosamin and Chondroitin with MSM & Boswellia","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"1",}, {"productCategoryId":"P56586a9f100011","key":"pc.P56586a9f100011","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"GLU","parentCategories":"SUP","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:54","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Glucosamine","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"1",}, {"productCategoryId":"P56586a9f100010","key":"pc.P56586a9f100010","pseudoId":"SUP","ownerPartyId":"100000","description":"Imported from CSV","lastUpdatedStamp":"2024-05-25 16:54","fromDate":"2024-05-01 00:00","categoryName":"Dietary Supplement","storeCategoryTypeEnumId":"PsctBrowseRoot","isLoaded":true,"productStoreId":"store.P56586a9f100000","version":"3","productCategoryTypeEnumId":"e.PctCatalog",}, {"productCategoryId":"P56586a9f100051","key":"pc.P56586a9f100051","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"TSH","parentCategories":"APP","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:41","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Áo thun","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"8",}, {"productCategoryId":"P56586a9f100009","key":"pc.P56586a9f100009","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"PAJ","parentCategories":"APP","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:41","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Pajamas","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"7",}, {"productCategoryId":"P56586a9f100008","key":"pc.P56586a9f100008","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"PAN","parentCategories":"APP","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:41","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Pants","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"6",}, {"productCategoryId":"P56586a9f100002","key":"pc.P56586a9f100002","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"NIG","parentCategories":"APP","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:41","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Night Gown","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"5",}, {"productCategoryId":"P56586a9f100007","key":"pc.P56586a9f100007","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"DRE","parentCategories":"APP","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:41","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Dress","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"4",}, {"productCategoryId":"P56586a9f100012","key":"pc.P56586a9f100012","productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"VIT","parentCategories":"SUP","storeCategoryTypeEnumId":"PsctQuickAdd","version":"3","lastUpdatedStamp":"2024-05-25 16:54","description":"Imported from CSV","fromDate":"2024-05-01 00:00","categoryName":"Vitamins","isLoaded":true,"productStoreId":"store.P56586a9f100000","ownerPartyId":"100000","sequenceNum":"2",}];
-    const sessionToken = "60b0bcf6";
-    const storeId = "P56586a9f100000";
+    const categories = [{"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"GLU","key":"pc.p56586a9f100016","categoryName":"Glucosamin and Chondroitin with MSM & Burdock Root","ownerPartyId":"100000","sequenceNum":"1","lastUpdatedStamp":"2024-09-28 03:09","version":"9","productCategoryId":"p56586a9f100016","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"GCBR","storeCategoryTypeEnumId":"PsctAdminAllow","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"APP","key":"pc.p56586a9f100008","categoryName":"Pants","ownerPartyId":"100000","sequenceNum":"7","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100008","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"PAN","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"GLU","key":"pc.p56586a9f100018","categoryName":"Glucosamin and Chondroitin with MSM & Boswellia","ownerPartyId":"100000","sequenceNum":"3","storeCategoryTypeEnumId":"PsctViewAllow","version":"6","productCategoryId":"p56586a9f100018","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"GCBL","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"GLU","key":"pc.p56586a9f100017","categoryName":"Glucosamin and Chondroitin with MSM & Turmeric","ownerPartyId":"100000","sequenceNum":"2","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100017","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"GCT","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"SUP","key":"pc.p56586a9f100014","categoryName":"Glucosamine","ownerPartyId":"100000","sequenceNum":"1","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100014","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"GLU","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"APP","key":"pc.p56586a9f100006","categoryName":"Short","ownerPartyId":"100000","sequenceNum":"3","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100006","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"SHO","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"APP","key":"pc.p56586a9f100001","fromDate":"2024-09-28 00:00","categoryName":"Apparel","version":"2","storeCategoryTypeEnumId":"PsctQuickAdd","productStoreId":"store.p56586a9f100000","lastUpdatedStamp":"2024-09-28 03:09","ownerPartyId":"100000","productCategoryId":"p56586a9f100001","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"APP","key":"pc.p56586a9f100004","categoryName":"Underwear","ownerPartyId":"100000","sequenceNum":"1","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100004","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"UND","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"APP","key":"pc.p56586a9f100000","categoryName":"Night Gown","ownerPartyId":"100000","sequenceNum":"2","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100000","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"NIG","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"APP","key":"pc.p56586a9f100009","categoryName":"Pajamas","ownerPartyId":"100000","sequenceNum":"4","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100009","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"PAJ","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"APP","key":"pc.p56586a9f100010","categoryName":"Áo dài","ownerPartyId":"100000","sequenceNum":"5","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100010","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"AOD","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"APP","key":"pc.p56586a9f100002","categoryName":"Sport wear","ownerPartyId":"100000","sequenceNum":"6","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100002","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"SPO","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"APP","key":"pc.p56586a9f100012","categoryName":"Mũ - Nón","ownerPartyId":"100000","sequenceNum":"8","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100012","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"HAT","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"APP","key":"pc.p56586a9f100011","categoryName":"Áo thun","ownerPartyId":"100000","sequenceNum":"9","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100011","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"TSH","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","pseudoId":"SUP","key":"pc.p56586a9f100013","fromDate":"2024-09-28 00:00","categoryName":"Dietary Supplement","version":"2","storeCategoryTypeEnumId":"PsctQuickAdd","productStoreId":"store.p56586a9f100000","lastUpdatedStamp":"2024-09-28 03:09","ownerPartyId":"100000","productCategoryId":"p56586a9f100013","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"SUP","key":"pc.p56586a9f100015","categoryName":"Vitamins","ownerPartyId":"100000","sequenceNum":"2","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100015","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"VIT","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctCatalog","parentCategories":"APP","key":"pc.p56586a9f100007","categoryName":"Dress","ownerPartyId":"100000","sequenceNum":"10","storeCategoryTypeEnumId":"PsctQuickAdd","version":"2","productCategoryId":"p56586a9f100007","productStoreId":"store.p56586a9f100000","fromDate":"2024-09-28 00:00","pseudoId":"DRE","lastUpdatedStamp":"2024-09-28 03:09","isLoaded":true,}, {"productCategoryTypeEnumId":"e.PctInternal","pseudoId":"GleecyUSViewable","key":"pc.p56586a9f100022","fromDate":"2024-09-28 00:00","categoryName":"GleecyUSViewable","version":"2","storeCategoryTypeEnumId":"PsctViewAllow","productStoreId":"store.p56586a9f100000","lastUpdatedStamp":"2024-09-28 05:04","ownerPartyId":"100000","productCategoryId":"p56586a9f100022","isLoaded":true,}];
+    const sessionToken = "60e298d6";
+    const storeId = "p56586a9f100000";
     const currencyUomId = "undefined"
+
+    // Render the button component
+    
+
 </script>
-<style>
-    .pt-180 {
-        padding-top: 720px;
-    }
-</style>
 </head>
 
 <body class="relative">
     <svg class="hidden" xmlns="http://www.w3.org/2000/svg">
         <style>
             path {
-                fill: lightgray;
+                fill: rgb(31 41 55 / var(--tw-text-opacity)) ;
             }
         </style>
         <symbol id="search" viewBox="0 0 24 24">
@@ -81,13 +84,23 @@
                     class="rounded-l-lg border-none border-r-2 shadow-md h-full bg-gray-300 max-w-40 sm:max-w-80 lg:max-w-md"
                     style="width: 50px;">
                     <option value="cat1" selected>All</option>
-                    <option value='pc.P56586a9f100006' selected>Short</option>
-                    <option value='pc.P56586a9f100005' selected>Bra</option>
-                    <option value='pc.P56586a9f100003' selected>Apparel</option>
-                    <option value='pc.P56586a9f100011' selected>Glucosamine</option>
-                    <option value='pc.P56586a9f100010' selected>Dietary Supplement</option>
-                    <option value='pc.P56586a9f100009' selected>Pajamas</option>
-                    <option value='pc.P56586a9f100012' selected>Vitamins</option>
+                    <option value='pc.p56586a9f100016' selected>Glucosamin and Chondroitin with MSM & Burdock Root</option>
+                    <option value='pc.p56586a9f100008' selected>Pants</option>
+                    <option value='pc.p56586a9f100018' selected>Glucosamin and Chondroitin with MSM & Boswellia</option>
+                    <option value='pc.p56586a9f100017' selected>Glucosamin and Chondroitin with MSM & Turmeric</option>
+                    <option value='pc.p56586a9f100014' selected>Glucosamine</option>
+                    <option value='pc.p56586a9f100006' selected>Short</option>
+                    <option value='pc.p56586a9f100001' selected>Apparel</option>
+                    <option value='pc.p56586a9f100004' selected>Underwear</option>
+                    <option value='pc.p56586a9f100000' selected>Night Gown</option>
+                    <option value='pc.p56586a9f100009' selected>Pajamas</option>
+                    <option value='pc.p56586a9f100010' selected>Áo dài</option>
+                    <option value='pc.p56586a9f100002' selected>Sport wear</option>
+                    <option value='pc.p56586a9f100012' selected>Mũ - Nón</option>
+                    <option value='pc.p56586a9f100011' selected>Áo thun</option>
+                    <option value='pc.p56586a9f100013' selected>Dietary Supplement</option>
+                    <option value='pc.p56586a9f100015' selected>Vitamins</option>
+                    <option value='pc.p56586a9f100007' selected>Dress</option>
                 </select>
             </div>
             <div class="border-none flex flex-row flex-nowrap w-full relative rounded-r-lg">
@@ -166,11 +179,108 @@
     </nav>
 
     <!--Modal Dialogs LOGIN-->
-    <div x-ref="loginDialog" x-data="userLogin" x-init="loadHtml($el, '/components/login')" @open-login.window="open = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
-    style="background-color: rgba(0,0,0,.5);" x-show="open"></div>
-    <div x-data="new Cart($el)" x-init="loadHtml($el, '/components/cart')" @open-cart.window="open = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
-    style="background-color: rgba(0,0,0,.5);" x-show="open"></div>
-    
+    <div x-ref="loginDialog" x-data="userLogin($el, '/components/login')" @open-login.window="isOpen = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
+    style="background-color: rgba(0,0,0,.5);" x-show="isOpen"></div>
+    <div x-data="cartDialog($el, 'paypal-button-container')" @open-cart.window="isOpen = true" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
+        style="background-color: rgba(0,0,0,.5);" x-show="isOpen">
+        <div class="relative mt-32 mb-auto w-full sm:w-4/5 sm:mx-auto sm:max-h-screen bg-gray-100 bg-opacity-90 font-[sans-serif]">
+    <div class="flex flex-col sm:flex-row gap-6 max-lg:gap-4">
+        <div class="bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 w-full sm:w-auto sm:min-w-[300px] sm:top-0 lg:min-w-[370px] flex flex-col flex-nowrap">
+            <div class="px-4 py-8 sm:overflow-auto sm:h-[calc(100vh-60px)] mb-auto">
+                <div class="space-y-4">
+                    <template x-for="orderItem in store.orderItemList">
+                        <div x-data="orderItem" class="flex items-start gap-4">
+                            <div class="w-32 h-32 max-lg:w-24 max-lg:h-24 flex shrink-0 bg-gray-300 rounded-md">
+                                <img :src="image"
+                                    class="w-full object-cover" />
+                            </div>
+                            <div class="w-full">
+                                <h3 class="text-base text-white" x-text="productName"></h3>
+                                <ul class="text-xs text-gray-300 space-y-2 mt-2">
+                                    <template x-for="(feature, featureTypeId) in features">
+                                        <li class="flex flex-wrap gap-4"><span x-text="feature.featureTypeDescription"></span><span class="ml-auto" x-text="feature.abbrev"></span></li>
+                                    </template>
+                                    <li class="flex flex-wrap gap-4">Quantity <span class="ml-auto" x-text="quantity"></span></li>
+                                    <li class="flex flex-wrap gap-4">Price <span class="ml-auto" x-text="unitAmount"></span></li>
+                                </ul>
+                            </div>
+                        </div>    
+                    </template>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 w-full p-4 mt-auto">
+                <h4 class="flex flex-wrap gap-4 text-base text-white">Total <span class="ml-auto">$84.00</span></h4>
+            </div>
+        </div>
+
+        
+        <div class="max-w-4xl w-full h-max rounded-md px-4 py-8">
+            <h3 class="text-base text-gray-800 mb-4">Shipping Address</h3>
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <input type="text" placeholder="First Name"
+                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+                </div>
+                <div>
+                    <input type="text" placeholder="Last Name"
+                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+                </div>
+                <div class="md:col-span-2">
+                    <input type="text" placeholder="Address Line 1"
+                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+                </div>
+                <div class="md:col-span-2">
+                    <input type="text" placeholder="Address Line 1"
+                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+                </div>
+                <div>
+                    <select x-ref="country" @change="$dispatch('countrychanged', {country: $el.value})"
+                        class="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded pl-3 pr-8 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-400 shadow-sm focus:shadow-md appearance-none cursor-pointer">
+                        <option value="_NA_" class="text-gray-500">Select Country</option>
+                        <option value="VNM">Vietnam</option>
+                        <option value="USA">United State</option>
+                    </select>
+                </div>
+                <div>
+                    <select x-data="{regions: []}" @countrychanged.window="regions = GeoService.getRegions($event.detail.country)"
+                        class="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded pl-3 pr-8 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-400 shadow-sm focus:shadow-md appearance-none cursor-pointer">
+                        <option value="_NA_">State/Province</option>
+                        <template x-for="region in regions">
+                            <option :value="region.geoId" x-text="region.geoName"></option>
+                        </template>
+                    </select>
+                </div>  
+                <div>
+                    <input type="text" placeholder="City"
+                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+                </div>
+                <div>
+                    <input type="text" placeholder="Zip Code"
+                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+                </div>
+                <div>
+                    <input type="email" placeholder="Email"
+                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+                </div>
+
+                <div>
+                    <input type="tel" placeholder="Phone No."
+                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+                </div>
+                <div id="paypal-button-container" class="col-span-2"></div>
+                <div class="col-span-2 text-center">-- OR --</div>
+                <div class="col-span-2">
+                    <button type="button" x-on:click="close"
+                        class="rounded max-w-3xl bg-paypal px-6 py-3 w-full text-sm tracking-wide hover:bg-gray-100 border text-white max-md:order-1">Continue Shopping</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+    </div>
+    <!-- loadHtml($el, '/components/cart').then(()=>{paypalBtn.render('#paypal-button-container');})-->
     {* main *}
 
 </body>

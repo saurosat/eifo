@@ -1,0 +1,90 @@
+<div id="paypal-button-container" class="paypal-button-container"></div>
+<div id="checkout-form">
+    <!-- Containers for Card Fields hosted by PayPal -->
+    <div id="card-name-field-container"></div>
+    <div id="card-number-field-container"></div>
+    <div id="card-expiry-field-container"></div>
+    <div id="card-cvv-field-container"></div>
+    <!-- To be replaced with your own Billing Address Fields -->
+    <div>
+        <label for="card-billing-address-line-1">Billing Address</label>
+        <input type="text" id="card-billing-address-line-1" name="card-billing-address-line-1" autocomplete="off"
+            placeholder="Address line 1">
+    </div>
+    <div>
+        <input type="text" id="card-billing-address-line-2" name="card-billing-address-line-2" autocomplete="off"
+            placeholder="Address line 2">
+    </div>
+    <div>
+        <input type="text" id="card-billing-address-admin-area-line-1""
+   name=" card-billing-address-admin-area-line-1"" autocomplete="off" placeholder="Admin area line 1">
+    </div>
+    <div>
+        <input type="text" id="card-billing-address-admin-area-line-2" name="card-billing-address-admin-area-line-2"
+            autocomplete="off" placeholder="Admin area line 2">
+    </div>
+    <div>
+        <input type="text" id="card-billing-address-country-code" name="card-billing-address-country-code"
+            autocomplete="off" placeholder="Country code">
+    </div>
+    <div>
+        <input type="text" id="card-billing-address-postal-code" name="card-billing-address-postal-code"
+            autocomplete="off" placeholder="Postal/zip code">
+    </div>
+    <br><br>
+    <button id="card-field-submit-button" type="button">
+        Pay now with Card Fields
+    </button>
+</div>
+<script src="https://www.paypal.com/sdk/js?components=buttons&client-id=AcdrYvOADBR9Bxhr7BtOIRDwwfhEOLdMHvvt89lTqxGdx_n6t9r5HdU6O4jn4qv1aSX0azdbw6TJA9wO"></script>
+<script>
+    // Render the button component
+    paypal.Buttons(
+        {
+            style: {
+                layout: 'vertical',
+                color: 'blue',
+                shape: 'rect',
+                label: 'paypal'
+            },
+            // Sets up the transaction when a payment button is clicked
+            createOrder: function (data) {
+                return Alpine.store('cartInfo').checkout(data);
+                // return fetch("myserver.com/api/orders", {
+                //     method: "POST",
+                //     // Use the "body" parameter to optionally pass additional order information
+                //     // such as product ID or amount
+                //     body: {
+                //         paymentSource: data.paymentSource,
+                //     },
+                // }).then((response) => response.json())
+                //     .then((order) => order.id);
+            },
+            // Finalize the transaction after payer approval
+            onApprove: function (data) {
+                return fetch(`myserver.com/api/orders/${data.orderID}/capture`, {
+                    method: "POST",
+                })
+                    .then((response) => response.json())
+                    .then((orderData) => {
+                        // Successful capture! For dev/demo purposes:
+                        console.log(
+                            "Capture result",
+                            orderData,
+                            JSON.stringify(orderData, null, 2),
+                        );
+                        var transaction = orderData.purchase_units[0].payments.captures[0];
+                        // Show a success message within this page. For example:
+                        // var element = document.getElementById('paypal-button-container');
+                        // element.innerHTML = '<h3>Thank you for your payment!</h3>';
+                        // Or go to another URL: actions.redirect('thank_you.html');
+                    });
+            },
+            onError: function (error) {
+                // Do something with the error from the SDK
+            },
+        }
+    ).render("#paypal-button-container");
+
+
+</script>

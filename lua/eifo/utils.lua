@@ -392,6 +392,15 @@ utils.printTable = function(tbl)
         ngx.say (k..": "..utils.toString(v).."<br/>")
     end
 end
+utils.getHashedString = function (str, len)
+    local bytes = {string.byte(str, 1, -1)}
+    local h = 0
+    for i = 1, #bytes, 1 do
+        local bits = tonumber(bytes[i])
+        h = bit.band(h*31 + bits, 0x7fffffff)
+    end
+    return string.format("%0"..len.."x", h)
+end
 
 utils.lifo = lifo
 

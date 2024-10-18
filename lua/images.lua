@@ -5,8 +5,8 @@ local function responseError(status, msg)
     ngx.exit(0)
 end
 
-local pseudoId, sig, size, fileName, ext = ngx.var.pseudoId,
-  ngx.var.sig, ngx.var.size, ngx.var.fileName, ngx.var.ext
+local pseudoId, sig, size, fileName, ext = 
+        ngx.var.pseudoId, ngx.var.sig, ngx.var.size, ngx.var.fileName, ngx.var.ext
 
 if size == "000x000" then
     size = ""
@@ -43,7 +43,7 @@ if fileName == "_NA_" then -- get image file names
         end
     end
     if not assoc then
-        ngx.log(ngx.INFO, "Product assocs of "..productId.." is not found")
+        ngx.log(ngx.INFO, "PatVariant assoc of "..productId.." is not found")
         responseError(ngx.HTTP_NOT_FOUND, "Product assocs of "..productId.." is not found")
         return
     end
@@ -74,7 +74,7 @@ if fileName == "_NA_" then -- get image file names
                 end
                 if matched then
                     local iFr, iTo = imgNames[i]:find("%d%d%d?%d?[xX]%d%d%d?%d?")
-                    local fSize = fr and imgNames[i]:sub(iFr, iTo) or nil
+                    local fSize = iFr and imgNames[i]:sub(iFr, iTo) or nil
                     ngx.log(ngx.DEBUG, "fSize = "..(fSize or "nil")..", size = "..size)
                     if fSize == size then
                         destUrl = imgNames[i]
@@ -113,7 +113,7 @@ if fileName == "_NA_" then -- get image file names
 end
 
 local signature = store:getSignature(fileName.."."..size)
-if sig == nil or signature ~= sig then
+if sig and signature ~= sig then
     responseError(ngx.HTTP_FORBIDDEN, "Invalid signature: sig = "..sig..", signature="..signature)
     return
 end

@@ -166,7 +166,7 @@ function _record:load(conn)
     local eData = conn:hgetall(self.key)
     if not eData or utils.isTableEmpty(eData) then
         local err = "Entity key '"..self.key.."' not found in "..self._table._name
-        ngx.log(ngx.INFO, err)
+        ngx.log(ngx.DEBUG, err)
         return nil, err
     end
 
@@ -318,12 +318,18 @@ local function notifyAll(records, observers, oldVals, newVals)
     local record = records[1]
     local leftTables = record._table._leftTables
     local leftCols = record._table._leftCols
-    for colName, tblName in pairs(leftCols) do
+    for colName, tblInfo in pairs(leftCols) do
         if string.sub(colName, -2) == "Id" then
-            local lRecord = record[string.sub(colName, 1, -3)]
-            local lTbl = leftTables[tblName]
-            local leftObservers = lTbl._observers
-            notifyAll({lRecord, table.unpack(records)}, leftObservers, oldVals, newVals)
+            local lRecordName =  string.sub(colName, 1, -3)
+            local lRecord = record[lRecordName]
+            if lRecord then
+                local tblName = tblInfo[1]
+                local lTbl = leftTables[tblName]
+                local leftObservers = lTbl._observers
+                notifyAll({lRecord, table.unpack(records)}, leftObservers, oldVals, newVals)
+            else
+                ngx.log(ngx.DEBUG, lRecordName.." is not found. Key: "..(record[colName] or "nil"))
+            end
         end
     end
 end

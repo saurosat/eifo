@@ -1,5 +1,7 @@
 const screenWidth = screen.width;
 const jsonContentType = "application/json;charset=UTF-8";
+
+
 String.prototype.hashCode = function() {
     var hash = 0,
       i, chr;
@@ -11,149 +13,304 @@ String.prototype.hashCode = function() {
     }
     return hash;
 }
-  
-// const categories = {* catJson *};
-// const sessionToken = "{* token *}";
-// const storeId = "{* storeId *}";
-// const currencyUomId = "{* currencyUomId *}"
 
-function getHeaders() {
-    let ua = Alpine.store('user')
-    let headers = { "Content-Type": "application/json;charset=UTF-8", "store": storeId, "moquiSessionToken": ua.token, "SessionToken" : ua.token, "X-CSRF-Token": ua.token }
-    if(ua.apiKey != null) {
-        headers["api_key"] = ua.apiKey;
+class BOClient extends Observable {
+    constructor() {
+        super();
+        if(this.__BOClient__ == null) {
+            const meta = Object.getPrototypeOf(this);
+            meta.token = Alpine.$persist(sessionToken).using(sessionStorage);
+            meta.store = Alpine.$persist(storeId).using(sessionStorage);
+            meta.apiKey = Alpine.$persist('').using(sessionStorage);
+            meta.on = {};
+            meta.__BOClient__ = meta
+        }
     }
-    return headers;
-}
-function getReqConfig(method) {
-    return { headers: getHeaders(), hostname: "localhost", port: "8080", protocol: "http:", method: method }
-}
 
+    setMetaProperty(key, value) {
+        const meta = this.__BOClient__;
+        const oldVal = meta[key];
+        meta[key] = value;
+        let callbacks = meta.on[key];
+        if(callbacks && oldVal != value) {
+            if(callbacks[value]) {
+                const result = callbacks[value](this);
+                if(!result) {
+                    callbacks[value] = null;
+                } else if(typeof result == "function") {
+                    callbacks[value] = result;
+                }
+            } else {
+                for(let i = 0; i < callbacks.length; i++) {
+                    const callback = callbacks[i];
+                    if(callback == null) {
+                        continue;
+                    }
+                    const result = callback(this);
+                    if(!result) {
+                        callbacks[i] = null;
+                    } else if(typeof result == "function") {
+                        callback[i] = result;
+                    }
+                }
+            }
+        }
+    }
+    addCallback(func, key, value = null) {
+        const meta = this.__BOClient__;
+        if(meta.on[key] == null) {
+            meta.on[key] = [];
+        }
+        const callbacks = meta.on[key];
+        if(value == null) {
+            callbacks[value] = func;
+        } else {
+            callbacks.push(func);
+        }
+    }
+
+    getRequestConfig(method) {
+        let headers = { 
+            "Content-Type": "application/json;charset=UTF-8", 
+            "store": this.store, 
+            "moquiSessionToken": this.token, 
+            "SessionToken" : this.token, 
+            "X-CSRF-Token": this.token 
+        };
+        if(this.apiKey != null) {
+            headers["api_key"] = this.apiKey;
+        }
+        return { 
+            headers: headers, 
+            hostname: "localhost", 
+            port: "8080", 
+            protocol: "http:", 
+            method: method 
+        }
+    }
+}
 // document.addEventListener('alpine:initialized', () => {
 //     alert("initialized");
 // });
 function logout() {
-    LoginService.logout().then(function (data) {
-        let userStore = Alpine.store('user');
-        userStore.username = '';
-        userStore.apiKey = '';
-        userStore.token = sessionToken;
-    });
+    return Alpine.store("user").logout();
 }
-document.addEventListener('alpine:init', () => {
-    Alpine.store('user', {
-        loggedIn: Alpine.$persist(false).using(sessionStorage),
-        username: Alpine.$persist(''),
-        // firstName: '',
-        // lastName: '',
-        // email: '',
-        // phone: '',
-        token: Alpine.$persist(sessionToken).using(sessionStorage),
-        apiKey: Alpine.$persist('').using(sessionStorage),
-        userId: Alpine.$persist('').using(sessionStorage),
-        firstName: Alpine.$persist('_NA_').using(sessionStorage),
-        lastName: Alpine.$persist('_NA_').using(sessionStorage),
-        emailAddress: Alpine.$persist('_NA_').using(sessionStorage),
-        locale: Alpine.$persist('').using(sessionStorage),
-        setCustomerInfo(data) {
-            this.username = data.username;
-            this.userId = data.userId;
-            this.partyId = data.partyId;
-            this.firstName = data.firstName;
-            this.lastName = data.lastName;
-            this.locale = data.locale;
-            this.emailAddress = data.emailAddress;
-            this.contactMechId = data.telecomNumber ? data.telecomNumber.contactMechId : "";
-            this.contactNumber = data.telecomNumber ? data.telecomNumber.contactNumber : "";
-        },
-        logout() {
-            LoginService.logout().catch(() => {}).finally(() => {
-                this.username = '';
-                this.apiKey = '';
-                this.token = '';
-                this.loggedIn = false;
-            });
-        },
-        register() {
 
+class UserAccount extends BOClient {
+    constructor() {super();}
+
+    setInfo(data) {
+        if(data.moquiSessionToken) {
+            this.setMetaProperty("token", data.moquiSessionToken);
+            this.setMetaProperty("loggedIn", true);
         }
-    });
-    Alpine.store('cartInfo', {
-        paymentsTotal: Alpine.$persist(0),
-        orderPromoCodeDetailList: Alpine.$persist([]),
-        paymentInfoList: Alpine.$persist([]),
-        orderItemList: Alpine.$persist([]),
-        orderItemWithChildrenSet: Alpine.$persist([]),
-        totalUnpaid: Alpine.$persist(0),
-        orderPart: Alpine.$persist({}),
-        orderHeader: Alpine.$persist({}),
-        productsQuantity: Alpine.$persist(0),
-        open: false,
-        assign(data) {
-            if(typeof(data.orderItemList) == 'undefined') return;
-            for(var i = 0; i < data.orderItemList.length; i++) {
-                if(data.orderItemList[i].itemTypeEnumId == 'ItemProduct') {
-                    this.productsQuantity += data.orderItemList[i].quantity;
-                }
+        if(data.apiKey) {
+            this.setMetaProperty("apiKey", data.apiKey);
+        }
+
+        let cInfo = data.customerInfo;
+        this.username = !cInfo.username ? "" : cInfo.username;
+        this.userId = !cInfo.userId ? "" : cInfo.userId;
+        this.partyId = !cInfo.partyId ? "" : cInfo.partyId;
+        this.firstName = !cInfo.firstName ? "" : cInfo.firstName;
+        this.lastName = !cInfo.lastName ? "" : cInfo.lastName;
+        this.locale = !cInfo.locale ? "" : cInfo.locale;
+        this.emailAddress = !cInfo.emailAddress ? "" : cInfo.emailAddress;
+        this.contactMechId = cInfo.telecomNumber ? cInfo.telecomNumber.contactMechId : "";
+        this.contactNumber = cInfo.telecomNumber ? cInfo.telecomNumber.contactNumber : "";
+    }
+    login(username, password) {
+        if (username.length < 3 || password.length < 3) {
+            return {error: "Username or password is missing"};
+        }
+        const ua = this;
+        return LoginService.login({ username: this.username, password: this.password }, this.reqCfg)
+            .then((data) => {
+                ua.setInfo(data);
+                return {};
+            })
+            .catch((error) => {
+                return {error: error.response.message }; //TODO: , statusCode: error.??
+            })
+            .finally(() => {
+                ua.notifyAll();
+            });
+    }
+    logout() {
+        const ua = this;
+        LoginService.logout().catch((error) => {
+            return {error: error.response.message }; //TODO: , statusCode: error.??
+        }).finally(() => {
+            ua.setMetaProperty("token", sessionToken);
+            ua.setMetaProperty("apiKey", '');
+            ua.setMetaProperty("loggedIn", false);
+    
+            ua.username = '';
+            ua.notifyAll();
+        });
+    }
+    register() {
+        //TODO 
+    }
+}
+class Cart extends BOClient {
+    constructor() {
+        super();
+        this.isLoaded = false;
+        const self = this;
+        this.addCallback(()=>{return self.load().then(() => true); }, "loggedIn", true)
+        this.addCallback(()=>{self.reset(); return true; }, "loggedIn", false)
+    }
+    assign(data) {
+        if(!data.orderItemList) return;
+        for(var i = 0; i < data.orderItemList.length; i++) {
+            let oItem = data.orderItemList[i];
+            if(oItem.itemTypeEnumId == 'ItemProduct') {
+                this.productsQuantity += oItem.quantity;
             }
-            Object.assign(this, data)
-        },
-        reset() {
-            this.paymentsTotal = 0;
-            this.totalUnpaid = 0;
-            this.productsQuantity = 0;
-            this.orderPromoCodeDetailList = [];
-            this.paymentInfoList = [];
-            this.orderItemList = [];
-            this.orderItemWithChildrenSet = [];
-            this.orderPart = {};
-            this.orderHeader = {};
-        },
-        load() {
-            ProductService.getCartInfo(getReqConfig("post"))
-                    .then((data) => {
-                        this.reset();
-                        this.assign(data);
-                    });
-        },
-        addProduct(product, quantity = 1) {
-            let cart = this;
-            ProductService.addProductCart(product, getReqConfig("post"))
-            .then(function (data) {
-                cart.reset();
-                cart.assign(data);
-            });
-            // var ua = Alpine.store('user');
-            // if(ua.loggedIn) {
-            //     ProductService.addProductCart(product, getReqConfig("post"))
-            //             .then(function (data) {
-            //                 this.reset();
-            //                 this.assign(data);
-            //             });
-            // } else {
-            //     let pItemIndex = this.orderItemList.findIndex(item => item.productId === product.productId)
-            //     let pItem = this.orderItemList[pItemIndex]
-            //     if(pItem) {
-            //         pItem.quantity += quantity;
-            //         if(pItem.quantity <= 0) {
-            //             this.orderItemList.splice(pItemIndex, 1)
-            //         }
-            //     } else {
-            //         if(quantity > 0) {
-            //             pItem = {...product, quantity: quantity, currencyUomId: currencyUomId, productStoreId: storeId};
-            //             this.orderItemList.push(pItem)
-            //         }
-            //     }
-            // }
-            // alert("Added product " + product.pseudoId);
-        },
-        removeProduct(product, index = -1) {
-            let pIndex = index >= 0 ? index : this.orderItemList.findIndex(item => item.productId === product.productId)
-            this.orderItemList.splice(pIndex, 1)
+            oItem.image = "/" + oItem.productId + "." + sessionToken + ".128x128._NA_.jpg"
         }
-    });
+        Object.assign(this, data)
+    }
+    reset() {
+        this.paymentsTotal = 0;
+        this.totalUnpaid = 0;
+        this.productsQuantity = 0;
+        this.orderPromoCodeDetailList = [];
+        this.paymentInfoList = [];
+        this.orderItemList = [];
+        this.orderItemWithChildrenSet = [];
+        this.orderPart = {};
+        this.orderHeader = {};
+    }
+    load() {
+        const self = this;
+        if(!this.loggedIn) {
+            this.addCallback(()=>{return self.load().then(() => true);}, "loggedIn", true)
+            $dispatch('open-login');
+            return;
+        }
+        ProductService.getCartInfo(this.getReqConfig("post"))
+                .then((data) => {
+                    self.reset();
+                    self.assign(data);
+                    self.isLoaded = true;
+                });
+    }
+    addProduct(product, quantity = 1) {
+        const self = this;
+        if(!this.loggedIn) {
+            this.addCallback(()=>{return self.addProduct(product, quantity).then(() => false);}, "loggedIn", true)
+            $dispatch('open-login');
+            return;
+        }
 
-    Alpine.data('cartDialog', (dialog) => (new Cart(dialog)));
+        return ProductService.addProductCart(product, this.getReqConfig("post"))
+        .then(function (data) {
+            self.reset();
+            self.assign(data);
+        });
+    }
+    removeProduct(product, index = -1) {
+        let pIndex = index >= 0 ? index : this.orderItemList.findIndex(item => item.productId === product.productId)
+        this.orderItemList.splice(pIndex, 1)
+    }
+    checkout(data) {
+        if(this.paypalOrderId) {
+            return this.paypalOrderId;
+        }
+        const self = this;
+        const body = {
+            orderId: this.orderHeader.orderId,
+            paymentSource: data.paymentSource
+        };
+        if(this.ortherPart && this.ortherPart.orderPartSeqId) {
+            body.orderPartSeqId = this.ortherPart.orderPartSeqId;
+        }
+        return ProductService.checkoutCartOrder(body, this.getReqConfig("post")).then(function (data) {
+            self.paymentId = data.paymentId;
+            self.paypalOrderId = data.paypalOrderId;
+            return data.paypalOrderId;
+        });
+    }
+    createPaypalButton() {
+        if(this.paypalBtn) {
+            return this.paypalBtn;
+        }
+        const cart = this;
+        this.paypalBtn = paypal.Buttons({
+            style: {
+                layout: 'vertical',
+                color: 'blue',
+                shape: 'rect',
+                label: 'paypal'
+            },
+            // Sets up the transaction when a payment button is clicked
+            createOrder: function (data) {
+                return cart.checkout(data);
+            },
+            // Finalize the transaction after payer approval
+            onApprove: function (data) {
+                return fetch(`myserver.com/api/orders/${data.orderID}/capture`, {
+                    method: "POST",
+                }).then((response) => response.json())
+                    .then((orderData) => {
+                        // Successful capture! For dev/demo purposes:
+                        console.log(
+                            "Capture result",
+                            orderData,
+                            JSON.stringify(orderData, null, 2),
+                        );
+                        var transaction = orderData.purchase_units[0].payments.captures[0];
+                        // Show a success message within this page. For example:
+                        // var element = document.getElementById('paypal-button-container');
+                        // element.innerHTML = '<h3>Thank you for your payment!</h3>';
+                        // Or go to another URL: actions.redirect('thank_you.html');
+                    });
+            },
+            onError: function (error) {
+                // Do something with the error from the SDK
+            }
+        });
+        return this.paypalBtn;
+    }
+}
+function initAlpine() {
+    const userAccount = new UserAccount();
+    userAccount.username = Alpine.$persist('').using(sessionStorage);
+    userAccount.userId = Alpine.$persist('').using(sessionStorage);
+    userAccount.partyId = Alpine.$persist('').using(sessionStorage);
+    userAccount.firstName = Alpine.$persist('_NA_').using(sessionStorage);
+    userAccount.lastName = Alpine.$persist('_NA_').using(sessionStorage);
+    userAccount.locale = Alpine.$persist('').using(sessionStorage);
+    userAccount.emailAddress = Alpine.$persist('_NA_').using(sessionStorage);
+    userAccount.contactMechId = Alpine.$persist('').using(sessionStorage);
+    userAccount.contactNumber = Alpine.$persist('').using(sessionStorage);
+    Alpine.store('user', userAccount);
+
+    const cartInfo = new Cart();
+    cartInfo.paymentsTotal = Alpine.$persist(0);
+    cartInfo.orderPromoCodeDetailList = Alpine.$persist([]);
+    cartInfo.paymentInfoList = Alpine.$persist([]);
+    cartInfo.orderItemList = Alpine.$persist([]);
+    cartInfo.orderItemWithChildrenSet = Alpine.$persist([]);
+    cartInfo.totalUnpaid = Alpine.$persist(0);
+    cartInfo.orderPart = Alpine.$persist({});
+    cartInfo.orderHeader = Alpine.$persist({});
+    cartInfo.productsQuantity = Alpine.$persist(0);
+    Alpine.store('cartInfo', cartInfo);
+
+    Alpine.data('cartDialog', (ele, btn) => {
+        const cartDialog = new Dialog(ele, btn);
+        cartDialog.store = Alpine.store('cartInfo');
+        cartDialog.init = function() {
+            if(this.button) {
+                const paypalBtn = this.store.createPaypalButton();
+                paypalBtn.render(this.button);
+            } 
+        }
+        return cartDialog;
+    });
 
     Alpine.data('searchObj', () => ({
         cat: 'All',
@@ -170,43 +327,38 @@ document.addEventListener('alpine:init', () => {
 
         }
     }));
-    Alpine.data('userLogin', () => ({
-        username: Alpine.store('user').username,
-        password: null,
-        open: false,
-        errorMsg: null,
-        headers: getHeaders(),
-        isLoading: false,
-        login() {
-            if (this.username.length < 3 || this.password.length < 3) {
-                this.errorMsg = "Username or password is missing";
-                alert(this.errorMsg);
-                return;
+    Alpine.data('userLogin', (dialog, componentUrl) => {
+        const loginDialog = new Dialog(dialog);
+        loginDialog.store = Alpine.store("user");
+        loginDialog.init = function() {
+            this.isDone = userAccount.loggedIn;
+            this.username = userAccount.username;
+            this.password = null;
+            this.errorMsg = null;
+            this.reqCfg = getReqCfg("post", userAccount);
+            this.isLoading = false;
+            if(componentUrl) {
+                loadHtml(this.dialog, componentUrl);
             }
-            this.isLoading = true;
-            this.errorMsg = null; 
-            LoginService.login({ username: this.username, password: this.password }
-                , getReqConfig("post"))
-                .then((data) => {
-                    let userStore = Alpine.store('user');
-                    userStore.setCustomerInfo(data.customerInfo);
-                    userStore.token = data.moquiSessionToken;
-                    userStore.apiKey = data.apiKey;
-                    this.open = false;
-                    this.isLoading = false;
-                    this.loggedIn = true;
-                    Alpine.store('cartInfo').load()
-                })
-                .catch((error) => {
-                    if (!!error.response && !!error.response.headers) {
-                        this.headers.moquiSessionToken = error.response.headers.moquisessiontoken;
-                        this.token = error.response.headers.moquisessiontoken;
-                    }
-                    this.errorMsg = error.response.data.errors;
-                    this.isLoading = false;
-                });
         }
-    }));
+
+        loginDialog.invoke = function() {
+            this.isLoading = true;
+            const self = this;
+            const store = this.store;
+            return store.login(this.username, this.password).then((result) => {
+                if(result.error) {
+                    alert(result.error);
+                } else {
+                    store.setInfo(data);
+                    store.invoke();
+                }    
+            }).finally(() => {
+                self.isLoading = false;
+            });
+        }
+        return loginDialog;
+    });
     Alpine.data('Promotion', () => ({
         discount: "",
         title: "",
@@ -221,5 +373,6 @@ document.addEventListener('alpine:init', () => {
             this.actionLink = promotionObj.actionLink;
         }
     }));
+}
 
-});
+document.addEventListener('alpine:init', initAlpine);

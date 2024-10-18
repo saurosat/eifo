@@ -28,7 +28,10 @@ end
 function record:getImages()
     local images = {}
     local pseudoId = self.pseudoId
-    --ngx.log(ngx.DEBUG, pseudoId..".getImages()")
+    if not pseudoId then
+        ngx.log(ngx.ALERT, "pseudoId is NIL in record "..self._table._name..".key = "..self.key)
+        return {}
+    end
     local fileNames = eifo.store:getProductImageFileNames(pseudoId)
     if not fileNames or #fileNames == 0 then
         ngx.log(ngx.DEBUG, pseudoId.." has no image files")
@@ -131,7 +134,11 @@ function record:getVariants()
     end
     local variants = {}
     self:setMetaValue("variants", variants)
-    local features = self.selectableFeatures
+    local features = self:getSelectableFeatures()
+    if not features or not next(features) then
+        ngx.log(ngx.DEBUG, "Not found selectableFeatures for product "..self.key)
+        return nil
+    end
     for k, _ in pairs(features) do
         ngx.log(ngx.DEBUG, utils.toJson(k))
     end
@@ -206,7 +213,9 @@ function record:onLoaded()
             if not meta[assocType] then
                 meta[assocType] = utils.ArraySet:new()
             end
-            meta[assocType]:add(assoc.toProduct) --without 'Id', to get the object instead of the Id only
+            if assoc.toProduct then
+                meta[assocType]:add(assoc.toProduct) --without 'Id', to get the object instead of the Id only
+            end
         end
     end
 end

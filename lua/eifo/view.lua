@@ -176,11 +176,14 @@ _view.render = function(self, record, noLayout)
 
     record = record or {}
 
+    local reqHeaders = ngx.req.get_headers()
+    local contentType
     ngx.log(ngx.DEBUG, "\r\n\r\n Rendering: "..(record and utils.toJson(record) or "record is nil"))
     if self.template then
         local template = require("resty.template")
         local fn = template.compile(self.template, "no-cache")
         local sHtml = fn({record = record, main = "{* main *}"}) --> main for layout pre-compile
+        -- ngx.log(ngx.DEBUG, sHtml)
         if noLayout or not (self.layoutUri or self.layout) then
             return sHtml
         end
