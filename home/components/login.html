@@ -1,4 +1,4 @@
-<div class="relative mx-auto mt-32 px-3 h-80 w-80 bg-gray-100 bg-opacity-90">
+<div class="relative mx-auto mt-32 px-3 h-80 w-96 bg-gray-100 bg-opacity-90">
     <button x-on:click="isOpen = ! isOpen" class="bg-transparent absolute top-px right-px hover:bg-gray-50">
         <svg class="w-7 h-7 fill-black ">
             <use xlink:href="#x"></use>
@@ -51,4 +51,8 @@
     <button x-on:click="login()" class="mb-1 text-lg font-semibold bg-gray-800 w-full text-white rounded-lg px-6 py-3 block shadow-xl hover:text-white hover:bg-black">
         Login
     </button>
+    <div class="w-full bg-transparent text-center">- OR -</div>
+    <button x-on:click="loginAnonymous()" class="mb-1 text-lg font-semibold bg-gray-800 w-full text-white rounded-lg px-6 py-3 block shadow-xl hover:text-white hover:bg-black">
+        Shopping as anonymous
+    </button>        
 </div>

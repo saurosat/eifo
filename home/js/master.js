@@ -17,14 +17,6 @@ String.prototype.hashCode = function() {
 class BOClient extends Observable {
     constructor() {
         super();
-        if(this.__BOClient__ == null) {
-            const meta = Object.getPrototypeOf(this);
-            meta.token = Alpine.$persist(sessionToken).using(sessionStorage);
-            meta.store = Alpine.$persist(storeId).using(sessionStorage);
-            meta.apiKey = Alpine.$persist('').using(sessionStorage);
-            meta.on = {};
-            meta.__BOClient__ = meta
-        }
     }
 
     setMetaProperty(key, value) {
@@ -70,10 +62,11 @@ class BOClient extends Observable {
     }
 
     getRequestConfig(method) {
+
         let headers = { 
             "Content-Type": "application/json;charset=UTF-8", 
             "store": this.store, 
-            "moquiSessionToken": this.token, 
+            "moquiSessionToken": Alpine.raw(this.token), 
             "SessionToken" : this.token, 
             "X-CSRF-Token": this.token 
         };
@@ -102,7 +95,6 @@ class UserAccount extends BOClient {
     setInfo(data) {
         if(data.moquiSessionToken) {
             this.setMetaProperty("token", data.moquiSessionToken);
-            this.setMetaProperty("loggedIn", true);
         }
         if(data.apiKey) {
             this.setMetaProperty("apiKey", data.apiKey);
@@ -124,22 +116,34 @@ class UserAccount extends BOClient {
             return {error: "Username or password is missing"};
         }
         const ua = this;
-        return LoginService.login({ username: this.username, password: this.password }, this.reqCfg)
+        return LoginService.login({ username: this.username, password: this.password }, this.getRequestConfig('post'))
             .then((data) => {
+                ua.setMetaProperty("loggedIn", true);
                 ua.setInfo(data);
+                ua.notifyAll();
                 return {};
             })
             .catch((error) => {
-                return {error: error.response.message }; //TODO: , statusCode: error.??
-            })
-            .finally(() => {
+                return {error: error.message }; //TODO: , statusCode: error.??
+            });
+    }
+    loginAnonymous() {
+        const ua = this;
+        return LoginService.loginAnonymous({}, this.getRequestConfig('post'))
+            .then((data) => {
+                ua.setMetaProperty("loggedIn", true);
+                ua.setInfo(data);
                 ua.notifyAll();
+                return {};
+            })
+            .catch((error) => {
+                return {error: error.message }; //TODO: , statusCode: error.??
             });
     }
     logout() {
         const ua = this;
-        LoginService.logout().catch((error) => {
-            return {error: error.response.message }; //TODO: , statusCode: error.??
+        return LoginService.logout().catch((error) => {
+            return {error: error.message }; //TODO: , statusCode: error.??
         }).finally(() => {
             ua.setMetaProperty("token", sessionToken);
             ua.setMetaProperty("apiKey", '');
@@ -188,13 +192,14 @@ class Cart extends BOClient {
         if(!this.loggedIn) {
             this.addCallback(()=>{return self.load().then(() => true);}, "loggedIn", true)
             $dispatch('open-login');
-            return;
+            return self;
         }
-        ProductService.getCartInfo(this.getReqConfig("post"))
+        return ProductService.getCartInfo(this.getRequestConfig("post"))
                 .then((data) => {
                     self.reset();
                     self.assign(data);
                     self.isLoaded = true;
+                    return self;
                 });
     }
     addProduct(product, quantity = 1) {
@@ -202,14 +207,15 @@ class Cart extends BOClient {
         if(!this.loggedIn) {
             this.addCallback(()=>{return self.addProduct(product, quantity).then(() => false);}, "loggedIn", true)
             $dispatch('open-login');
-            return;
+            return self;
         }
 
-        return ProductService.addProductCart(product, this.getReqConfig("post"))
-        .then(function (data) {
-            self.reset();
-            self.assign(data);
-        });
+        return ProductService.addProductCart(product, this.getRequestConfig("post"))
+            .then(function (data) {
+                self.reset();
+                self.assign(data);
+                return self;
+            });
     }
     removeProduct(product, index = -1) {
         let pIndex = index >= 0 ? index : this.orderItemList.findIndex(item => item.productId === product.productId)
@@ -227,7 +233,7 @@ class Cart extends BOClient {
         if(this.ortherPart && this.ortherPart.orderPartSeqId) {
             body.orderPartSeqId = this.ortherPart.orderPartSeqId;
         }
-        return ProductService.checkoutCartOrder(body, this.getReqConfig("post")).then(function (data) {
+        return ProductService.checkoutCartOrder(body, this.getRequestConfig("post")).then(function (data) {
             self.paymentId = data.paymentId;
             self.paypalOrderId = data.paypalOrderId;
             return data.paypalOrderId;
@@ -275,7 +281,15 @@ class Cart extends BOClient {
         return this.paypalBtn;
     }
 }
-function initAlpine() {
+document.addEventListener('alpine:init', () => {
+    BOClient.prototype.token = Alpine.$persist(sessionToken).using(sessionStorage);
+    BOClient.prototype.store = Alpine.$persist(storeId).using(sessionStorage);
+    BOClient.prototype.apiKey = Alpine.$persist('').using(sessionStorage);
+    BOClient.prototype.loggedIn = Alpine.$persist(false).using(sessionStorage);
+    BOClient.prototype.on = {};
+    BOClient.prototype.__BOClient__ = BOClient.prototype;
+    Alpine.store('__BOClient__', BOClient.prototype);   
+
     const userAccount = new UserAccount();
     userAccount.username = Alpine.$persist('').using(sessionStorage);
     userAccount.userId = Alpine.$persist('').using(sessionStorage);
@@ -331,30 +345,36 @@ function initAlpine() {
         const loginDialog = new Dialog(dialog);
         loginDialog.store = Alpine.store("user");
         loginDialog.init = function() {
-            this.isDone = userAccount.loggedIn;
-            this.username = userAccount.username;
+            this.isDone = this.store.loggedIn;
+            this.username = this.store.username;
             this.password = null;
             this.errorMsg = null;
             this.reqCfg = getReqCfg("post", userAccount);
-            this.isLoading = false;
             if(componentUrl) {
                 loadHtml(this.dialog, componentUrl);
             }
         }
 
-        loginDialog.invoke = function() {
+        loginDialog.login = function() {
             this.isLoading = true;
             const self = this;
             const store = this.store;
             return store.login(this.username, this.password).then((result) => {
                 if(result.error) {
                     alert(result.error);
-                } else {
-                    store.setInfo(data);
-                    store.invoke();
-                }    
-            }).finally(() => {
-                self.isLoading = false;
+                }
+                self.invoke();
+            });
+        }
+        loginDialog.loginAnonymous = function() {
+            this.isLoading = true;
+            const self = this;
+            const store = this.store;
+            return store.loginAnonymous().then((result) => {
+                if(result.error) {
+                    alert(result.error);
+                }
+                self.invoke();
             });
         }
         return loginDialog;
@@ -373,6 +393,4 @@ function initAlpine() {
             this.actionLink = promotionObj.actionLink;
         }
     }));
-}
-
-document.addEventListener('alpine:init', initAlpine);
+});
