@@ -1,0 +1,56 @@
+<div class="grid md:grid-cols-2 gap-4">
+    <div class="col-span-2">
+        <select x-on:change="setAddressInfo(addressMap[event.target.value])">
+                <option value="_NA_" selected>Create new Address</option>
+            <template x-for="(addressInfo, addressId) in addressMap" >
+                <option :value="addressId" x-text="getAddressDisplayStr(addressInfo.postalAddress)"></option>
+            </template>
+        </select>
+    </div>
+    <div class="col-span-2">
+        <input type="text" placeholder="Full Name" x-model="toName"
+            class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+    </div>
+    <div class="md:col-span-2">
+        <input type="text" placeholder="Address Line 1" x-model="address1"
+            class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+    </div>
+    <div class="md:col-span-2">
+        <input type="text" placeholder="Address Line 2" x-model="address2"
+            class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+    </div>
+    <div>
+        <select x-ref="country" @change="$dispatch('countrychanged', {country: $el.value})" x-model="countryGeoId"
+            class="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded pl-3 pr-8 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-400 shadow-sm focus:shadow-md appearance-none cursor-pointer">
+            <option value="_NA_" class="text-gray-500">Select Country</option>
+            <option value="VNM">Vietnam</option>
+            <option value="USA">United State</option>
+        </select>
+    </div>
+    <div>
+        <select x-data="{regions: []}" @countrychanged.window="regions = getRegions($event.detail.country)" x-model="stateProvinceGeoId"
+            class="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded pl-3 pr-8 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-400 shadow-sm focus:shadow-md appearance-none cursor-pointer">
+            <option value="_NA_">State/Province</option>
+            <template x-for="region in regions">
+                <option :value="region.geoId" x-text="region.geoName"></option>
+            </template>
+        </select>
+    </div>  
+    <div>
+        <input type="text" placeholder="City" x-model="city"
+            class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+    </div>
+    <div>
+        <input type="text" placeholder="Zip Code" x-model="postalCode"
+            class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+    </div>
+    <div>
+        <input type="email" placeholder="Email" x-model="emailAddress"
+            class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+    </div>
+
+    <div>
+        <input type="tel" placeholder="Phone No." x-model="contactNumber"
+            class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
+    </div>
+</div>            

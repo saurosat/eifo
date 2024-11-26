@@ -3,7 +3,7 @@
         <div class="bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 w-full sm:w-auto sm:min-w-[300px] sm:top-0 lg:min-w-[370px] flex flex-col flex-nowrap">
             <div class="px-4 py-8 sm:overflow-auto sm:h-[calc(100vh-60px)] mb-auto">
                 <div class="space-y-4">
-                    <template x-for="orderItem in store.orderItemList">
+                    <template x-for="orderItem in cartInfo.orderItemList">
                         <div x-data="orderItem" class="flex items-start gap-4">
                             <div class="w-32 h-32 max-lg:w-24 max-lg:h-24 flex shrink-0 bg-gray-300 rounded-md">
                                 <img :src="image"
@@ -32,57 +32,8 @@
         
         <div class="max-w-4xl w-full h-max rounded-md px-4 py-8">
             <h3 class="text-base text-gray-800 mb-4">Shipping Address</h3>
-            <div class="grid md:grid-cols-2 gap-4">
-                <div>
-                    <input type="text" placeholder="First Name"
-                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
-                </div>
-                <div>
-                    <input type="text" placeholder="Last Name"
-                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
-                </div>
-                <div class="md:col-span-2">
-                    <input type="text" placeholder="Address Line 1"
-                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
-                </div>
-                <div class="md:col-span-2">
-                    <input type="text" placeholder="Address Line 1"
-                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
-                </div>
-                <div>
-                    <select x-ref="country" @change="$dispatch('countrychanged', {country: $el.value})"
-                        class="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded pl-3 pr-8 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-400 shadow-sm focus:shadow-md appearance-none cursor-pointer">
-                        <option value="_NA_" class="text-gray-500">Select Country</option>
-                        <option value="VNM">Vietnam</option>
-                        <option value="USA">United State</option>
-                    </select>
-                </div>
-                <div>
-                    <select x-data="{regions: []}" @countrychanged.window="regions = GeoService.getRegions($event.detail.country)"
-                        class="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded pl-3 pr-8 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-400 shadow-sm focus:shadow-md appearance-none cursor-pointer">
-                        <option value="_NA_">State/Province</option>
-                        <template x-for="region in regions">
-                            <option :value="region.geoId" x-text="region.geoName"></option>
-                        </template>
-                    </select>
-                </div>  
-                <div>
-                    <input type="text" placeholder="City"
-                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
-                </div>
-                <div>
-                    <input type="text" placeholder="Zip Code"
-                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
-                </div>
-                <div>
-                    <input type="email" placeholder="Email"
-                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
-                </div>
-
-                <div>
-                    <input type="tel" placeholder="Phone No."
-                        class="px-4 py-3 bg-gray-100 focus:bg-transparent text-gray-800 w-full text-sm rounded-md focus:outline-blue-600" />
-                </div>
+            {(/components/addressForm)}
+            <div class="grid md:grid-cols-2 gap-4" >
                 <div id="paypal-button-container" class="col-span-2"></div>
                 <div class="col-span-2 text-center">-- OR --</div>
                 <div class="col-span-2">
@@ -90,7 +41,6 @@
                         class="rounded max-w-3xl bg-paypal px-6 py-3 w-full text-sm tracking-wide hover:bg-gray-100 border text-white max-md:order-1">Continue Shopping</button>
                 </div>
             </div>
-
         </div>
     </div>
 </div>
