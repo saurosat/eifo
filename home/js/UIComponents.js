@@ -22,10 +22,31 @@ function invokeCallbackStack(callbackStack, value) {
     }
 }
 
-function handleResponse(response) {
-    return response.data;
+// function handleResponse(response) {
+//     return response.data;
+// }
+class Client {
+    getRequestConfig() {
+        return {headers: {"Content-Type": "application/json;charset=UTF-8"}};
+    }
+    handleResponse(response) {
+        return response.data;
+    }
+    get(url) {
+        return this.axios.get(url, this.getRequestConfig()).then(this.handleResponse);
+    }
+    put(url, data) {
+        return this.axios.put(url, data, this.getRequestConfig()).then(this.handleResponse);
+    }
+    post(url, data) {
+        return this.axios.post(url, data, this.getRequestConfig()).then(this.handleResponse);
+    }
+    delete(url) {
+        return this.axios.delete(url, this.getRequestConfig()).then(this.handleResponse);
+    }
 }
-class BOClient {
+class FOClient extends Client {}
+class BOClient extends Client {
     static {
         this.setMetaObject({});
     }
@@ -41,26 +62,12 @@ class BOClient {
         proto.meta = meta;
     }
     constructor() {
+        super();
         this.axios = axios.create({
             baseURL: 'http://localhost:8080/rest/s1/foi',
             //timeout: 1000,
             withCredentials: true
         });
-        this.handleResponse = function(response) {
-            return res
-        }
-    }
-    get(url) {
-        return this.axios.get(url, this.getRequestConfig()).then(handleResponse);
-    }
-    put(url, data) {
-        return this.axios.put(url, data, this.getRequestConfig()).then(handleResponse);
-    }
-    post(url, data) {
-        return this.axios.post(url, data, this.getRequestConfig()).then(handleResponse);
-    }
-    delete(url) {
-        return this.axios.delete(url, this.getRequestConfig()).then(handleResponse);
     }
     getCountries() {
         return this.get("/geos").then(data => data.resultList ? data.resultList : []);
