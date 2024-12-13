@@ -85,6 +85,9 @@
     -ms-flex: 50%; /* IE10 */
     flex: 50%;
 }
+.max-h-screen-4\/5 {
+    max-height: 80vh;
+}
 
 #loading {
     width: 100%;

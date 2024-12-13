@@ -31,6 +31,7 @@ function _view:new(paths, viewFile)
     end
     local tableDef = viewInfo.tableDef 
                     or assert(viewInfo.tableName and eifo.db.table[viewInfo.tableName])
+    ngx.log(ngx.DEBUG, "ViewInfo: "..utils.toJson(viewInfo))
     view.table = tableDef:new({
         -- leftColumns = viewInfo.leftColumns,
         -- rightColumns = viewInfo.rightColumns,
@@ -177,7 +178,6 @@ _view.render = function(self, record, noLayout)
     record = record or {}
 
     local reqHeaders = ngx.req.get_headers()
-    local contentType
     ngx.log(ngx.DEBUG, "\r\n\r\n Rendering: "..(record and utils.toJson(record) or "record is nil"))
     if self.template then
         local template = require("resty.template")

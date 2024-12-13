@@ -101,7 +101,10 @@ function _table:new(tableInfo)
     if not self._rightCols then
         tbl._rightCols = {}
     end
-    tbl.toJsonColumns = tableInfo.toJsonColumns
+    if tableInfo.toJsonColumns then
+        ngx.log(ngx.DEBUG, "tableInfo.toJsonColumns = "..table.concat(tableInfo.toJsonColumns, ", "))
+        tbl.toJsonColumns = tableInfo.toJsonColumns
+    end
     tbl = self:extend(tbl)
     tbl.tblRegistry[tbl._name] = tbl
     ngx.log(ngx.DEBUG, "Created new table "..tbl._name)

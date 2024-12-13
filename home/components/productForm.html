@@ -1,0 +1,39 @@
+<div class="bg-gray-100 p-5" x-data="product">
+    <div class="mx-auto bg-white rounded-lg shadow-lg p-5">
+        <h1 class="text-2xl font-bold mb-4" x-text="name"></h1>
+        <div class="w-full">
+            <img :src="currentImage" class="w-full max-h-screen-4/5 object-cover rounded-lg mb-4 overflow-y-hidden" alt="Product Image">
+        </div>
+        <div class="flex space-x-2 mb-4">
+            <template x-for="image in images" :key="image">
+                <img :src="image" @click="currentImage = image" class="w-16 h-16 object-cover cursor-pointer rounded" alt="Product Thumbnail">
+            </template>
+        </div>
+        <p class="text-gray-600 mb-2" x-text="description"></p>
+        <p class="text-lg line-through text-red-500" x-text="listPrice"></p>
+        <p class="text-xl font-bold text-green-600" x-text="price"></p>
+        
+        <template x-for="(featureIds, featureTypeId) in featureIdsByType">
+            <div class="mt-4 flex">
+                <h2 class="text-lg font-semibold" x-text="'Select ' +  featureTypeById[featureTypeId].description"></h2>
+                <div class="flex space-x-2 mb-4">
+                    <template x-for="featureId in featureIds">
+                        <button x-data="featureById[featureId]" @click="select(featureTypeId, maskIndex)" :class="{'bg-blue-500 text-white': maskIndex===maskIdxByFType[featureTypeId], 'bg-gray-200': maskIndex!==maskIdxByFType[featureTypeId]}" class="py-1 px-2 rounded">
+                            <span x-text="abbrev"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </template>
+        <button class="mt-4 bg-green-500 text-white py-2 px-4 rounded">Add to Cart</button>
+    </div>
+</div>
+
+<!-- <div>
+    <h2 class="text-lg font-semibold">Select Color:</h2>
+    <div class="flex space-x-2 mb-4">
+        <template x-for="color in product.colors" :key="color">
+            <button @click="selectedColor = color" :class="{'border-4 border-black': selectedColor === color}" class="w-8 h-8 rounded-full" :style="'background-color: ' + color"></button>
+        </template>
+    </div>
+</div> -->

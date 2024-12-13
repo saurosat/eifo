@@ -74,8 +74,9 @@ store.getClientIp = function(self)
     return ip
 end
 store.getProductImageFileNames = function (self, pseudoId)
-    local path = eifo.basePath.."/home/img/"..pseudoId
+    local path = eifo.basePath.."/home/img/"..pseudoId.."*"
     local cmd = "find "..path.." -maxdepth 1"
+    ngx.log(ngx.DEBUG, cmd)
     local pfile, err = io.popen(cmd, "r")
     if not pfile then
         ngx.log(ngx.DEBUG, err or "Can not open directory")
@@ -85,20 +86,21 @@ store.getProductImageFileNames = function (self, pseudoId)
     -- ngx.log(ngx.DEBUG, list)
     pfile:close()
     local fileNames, idx = {}, 1
-    for fileName in list:gmatch(pseudoId.."/([^/]+)[\r\n]") do
-        -- ngx.log(ngx.DEBUG, fileName)
+    --for fileName in list:gmatch(pseudoId.."/([^/]+)[\r\n]") do
+    for fileName in list:gmatch("("..pseudoId.."[^/]*/[^/]+%.%a%a%a%a?)[\r\n]*") do
+        ngx.log(ngx.DEBUG, "Matched file name: "..fileName)
         fileNames[idx] = fileName
         idx = idx + 1
     end
     return fileNames
 end
-store.getResizedFileName = function (self, originFileName, size)
+store.getResizedImgUrl = function (self, originFileName, size)
     local pseudoId, fileName, ext = originFileName:match("^/([^%.]+)/([^%.]+)%.([^%.]+)$")
     local signature = store:getSignature(fileName.."."..size)
     return "/"..pseudoId.."."..signature.."."..size.."."..fileName.."."..ext
 end
 local function getEditedImageName(self, editKey)
-    local resizedFName = self.store:getResizedFileName(self.key, editKey)
+    local resizedFName = self.store:getResizedImgUrl(self.key, editKey)
     self[editKey] = resizedFName
     return resizedFName
 end

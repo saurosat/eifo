@@ -90,11 +90,11 @@ local function toJson(v, refs)
             end
             str = str.."]"
         else
-            str = "{"
+            str = "{ "
             for key, val in pairs(v) do
                 str = str..'"'..key..'"'..kvSep..toJson(val, refs)..","
             end
-            str = str.."}"
+            str = str:sub(1, -2).."}"
         end
     end
     refs[#refs] = nil

@@ -8,6 +8,8 @@ end
 local function __getByKey(self, sKey)
     --ngx.log(ngx.DEBUG, "Querying key = "..key)
     local meta = getmetatable(self)
+    --ngx.log(ngx.DEBUG, "metatable: "..utils.toJson(meta))
+    --ngx.log(ngx.DEBUG, "className = "..meta.className)
     local metaValue = meta[sKey]
     if metaValue then
         --ngx.log(ngx.DEBUG, "key = "..key..", Returning metavalue: "..(type(metaValue) == "string" and metaValue or " object"))
@@ -15,10 +17,10 @@ local function __getByKey(self, sKey)
     end
 
     local _table = meta._table
-    if sKey == "_table" then
-        return _table
-    end
-    --ngx.log(ngx.DEBUG, self.className..".__getByKey "..key..", self.key: "..(rawget(self, "key") or "nil")..", meta._table = "..(_table and _table._name or "nil"))
+    -- if sKey == "_table" then --> Redundant
+    --     return _table
+    -- end
+    --ngx.log(ngx.DEBUG, meta.className..".__getByKey "..key..", self.key: "..(rawget(self, "key") or "nil")..", meta._table = "..(_table and _table._name or "nil"))
     if _table then
         if sKey == "ids" then
             local fnIds = _table._fnIds
