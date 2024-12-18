@@ -42,10 +42,12 @@ function record:getChildren()
             rollup._table:remove(rollup)
         else
             local childCatType = child.productCategoryTypeEnumId
-            if not children[childCatType] then
-                children[childCatType] = utils.ArraySet:new()
+            if childCatType then
+                if not children[childCatType] then
+                    children[childCatType] = utils.ArraySet:new()
+                end
+                children[childCatType]:add(child)
             end
-            children[childCatType]:add(child)
         end
     end
     self.setMetaValue("children", children)

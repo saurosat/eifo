@@ -18,54 +18,57 @@ String.prototype.hashCode = function() {
 //     alert("initialized");
 // });
 function logout() {
-    return Alpine.store("user").logout();
+    const user = new UserAccount(Alpine.store("boConfig"));
+    return user.logout().catch((error) => {
+        alert(error.message);
+    });
 }
 
 document.addEventListener('alpine:init', () => {
     Alpine.store('boConfig', {
+        on: {},
+        timeout: 10000,
+        contentType: "application/json;charset=UTF-8",
+        baseURL: "http://localhost:8080/rest/s1/foi",
+        withCredentials: true,
+        defaultToken: Alpine.$persist(sessionToken),
         token: Alpine.$persist(sessionToken).using(sessionStorage),
-        store: Alpine.$persist(storeId).using(sessionStorage),
+        storeId: Alpine.$persist(storeId).using(sessionStorage),
         apiKey: Alpine.$persist('').using(sessionStorage),
-        loggedIn: Alpine.$persist(false).using(sessionStorage)
+        loggedIn: Alpine.$persist(false).using(sessionStorage),
+        username: Alpine.$persist('').using(sessionStorage),
+        userId: Alpine.$persist('').using(sessionStorage),
+        partyId: Alpine.$persist('').using(sessionStorage),
+        firstName: Alpine.$persist('_NA_').using(sessionStorage),
+        lastName: Alpine.$persist('_NA_').using(sessionStorage),
+        locale: Alpine.$persist('').using(sessionStorage),
+        emailAddress: Alpine.$persist('_NA_').using(sessionStorage),
+        contactMechId: Alpine.$persist('').using(sessionStorage),
+        contactNumber: Alpine.$persist('').using(sessionStorage),
+        postalAddressMap: Alpine.$persist({}).using(sessionStorage),
+
+        isCartLoaded: Alpine.$persist(false),
+        paymentsTotal: Alpine.$persist(0),
+        orderPromoCodeDetailList: Alpine.$persist([]),
+        paymentInfoList: Alpine.$persist([]),
+        orderItemList: Alpine.$persist([]),
+        orderItemWithChildrenSet: Alpine.$persist([]),
+        totalUnpaid: Alpine.$persist(0),
+        orderPart: Alpine.$persist({}),
+        orderHeader: Alpine.$persist({}),
+        productsQuantity: Alpine.$persist(0)
     });
-    BOClient.setMetaObject(Alpine.store('boConfig'));
 
-    const userAccount = new UserAccount();
-    userAccount.username = Alpine.$persist('').using(sessionStorage);
-    userAccount.userId = Alpine.$persist('').using(sessionStorage);
-    userAccount.partyId = Alpine.$persist('').using(sessionStorage);
-    userAccount.firstName = Alpine.$persist('_NA_').using(sessionStorage);
-    userAccount.lastName = Alpine.$persist('_NA_').using(sessionStorage);
-    userAccount.locale = Alpine.$persist('').using(sessionStorage);
-    userAccount.emailAddress = Alpine.$persist('_NA_').using(sessionStorage);
-    userAccount.contactMechId = Alpine.$persist('').using(sessionStorage);
-    userAccount.contactNumber = Alpine.$persist('').using(sessionStorage);
-    userAccount.postalAddressMap = Alpine.$persist({}).using(sessionStorage);
 
-    Alpine.store('user', userAccount);
-
-    const cartInfo = new Cart();
-    cartInfo.paymentsTotal = Alpine.$persist(0);
-    cartInfo.orderPromoCodeDetailList = Alpine.$persist([]);
-    cartInfo.paymentInfoList = Alpine.$persist([]);
-    cartInfo.orderItemList = Alpine.$persist([]);
-    cartInfo.orderItemWithChildrenSet = Alpine.$persist([]);
-    cartInfo.totalUnpaid = Alpine.$persist(0);
-    cartInfo.orderPart = Alpine.$persist({});
-    cartInfo.orderHeader = Alpine.$persist({});
-    cartInfo.productsQuantity = Alpine.$persist(0);
-    Alpine.store('cartInfo', cartInfo);
-
-    window.loginForm = new LoginForm(Alpine.store("user"));
+    window.loginForm = new LoginForm(Alpine.store('boConfig'));
     Alpine.data('userLogin', (dialog, componentUrl) => {
         window.loginForm.setDialog(dialog);
         window.loginForm.setComponentUrl(componentUrl);
         return loginForm;
     });
 
-    window.checkoutForm = new CheckoutForm(Alpine.store('cartInfo'));
-    window.checkoutForm.loginForm = loginForm;
-    window.checkoutForm.addressMap = userAccount.postalAddressMap;
+    window.checkoutForm = new CheckoutForm(Alpine.store('boConfig'));
+    window.checkoutForm.loginForm = window.loginForm;
     Alpine.data('cartDialog', (ele, btn) => { 
         window.checkoutForm.setDialog(ele);
         window.checkoutForm.setButton(btn);

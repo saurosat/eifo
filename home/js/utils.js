@@ -35,3 +35,11 @@ function loadHtml(containerEle, url) {
         .then((htmlText) => { containerEle.innerHTML = htmlText;})
         .catch((error) => {alert(error);});
 }    
+function hasValue(obj, propertyName) {
+    const propValue = getValue(obj, propertyName);
+    return propValue && propValue != "_NA_";
+}
+function getValue(obj, propertyName) {
+    if(obj == null) return null;
+    return obj[propertyName];
+}

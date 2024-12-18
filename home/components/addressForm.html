@@ -1,11 +1,11 @@
 <div class="grid md:grid-cols-2 gap-4">
     <div class="col-span-2">
-        <select x-on:change="setAddressInfo(addressMap[event.target.value])">
-                <option value="_NA_" selected>Create new Address</option>
-            <template x-for="(addressInfo, addressId) in addressMap" >
-                <option :value="addressId" x-text="getAddressDisplayStr(addressInfo.postalAddress)"></option>
-            </template>
-        </select>
+        <template x-for="(addressInfo, addressId) in addressMap" >
+            <div class="w-full flex flex-row">
+                <input type="radio" :id="addressId" name="addressId" :value="addressId" x-on:change="setAddressInfo(addressMap[event.target.value])">
+                <label :for="addressId" x-text="getAddressDisplayStr(addressInfo.postalAddress)"></label>
+            </div>
+        </template>
     </div>
     <div class="col-span-2">
         <input type="text" placeholder="Full Name" x-model="toName"

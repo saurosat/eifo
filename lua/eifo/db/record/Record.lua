@@ -314,7 +314,7 @@ function _record:persist(conn, tobeDeleted, nowEpoch)
 end
 local function notifyAll(records, observers, oldVals, newVals)
     for _, v in pairs(observers) do
-        ngx.log(ngx.DEBUG, "Receiver: "..utils.toString(v, ": ", "\r\n"))
+        --ngx.log(ngx.DEBUG, "Receiver: "..utils.toString(v, ": ", "\r\n"))
         v:_update(records, oldVals, newVals)
     end
     local record = records[1]

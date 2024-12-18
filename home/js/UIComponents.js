@@ -26,9 +26,86 @@ function invokeCallbackStack(callbackStack, value) {
 //     return response.data;
 // }
 class Client {
-    getRequestConfig() {
-        return {headers: {"Content-Type": "application/json;charset=UTF-8"}};
+    static EMPTY_STR = "";
+
+    constructor(store) {
+        this.store = store;
+        const defaultToken = this.store.defaultToken;
+        if(!defaultToken) defaultToken = Client.EMPTY_STR;
+        this.defaultToken = defaultToken;
     }
+    setConfig(key, value, defaultValue = Client.EMPTY_STR) {
+        if(value === null || value === undefined) value = defaultValue;
+        const cfg = this.store;
+        const oldVal = cfg[key];
+        cfg[key] = value; 
+        if(cfg.on && cfg.on[key] && value != oldVal) {
+            let callbackStack = cfg.on[key];
+            if(callbackStack && oldVal != value) {
+                invokeCallbackStack(callbackStack, value);
+            }                
+        }
+    }
+    get axios() {
+        return this.store.axios;
+    }
+    get baseURL() {
+        return this.store.baseURL;
+    }
+    get timeout() {
+        return this.store.timeout;
+    }
+    get storeId() {
+        return this.store.storeId;
+    }
+    get token() {
+        return this.store.token;
+    }
+    set token(tokenStr) {
+        this.setConfig("token", tokenStr, this.defaultToken);
+    }
+    get apiKey() {
+        return this.store.apiKey;
+    }
+    set apiKey(apiKey) {
+        this.setConfig("apiKey", apiKey);
+    }
+    get loggedIn() {
+        return this.store.loggedIn;
+    }
+    set loggedIn(isLoggedIn) {
+        this.setConfig("loggedIn", isLoggedIn ? true : false);
+    }
+    addCallback(func, key, value = null, callbackId = null) {
+        const cfg = this.store;
+        if(!cfg.on) {
+            cfg.on = {};
+        }
+        if(cfg.on[key] == null) {
+            cfg.on[key] = [];
+        }
+        const callbacks = cfg.on[key];
+        if(callbackId) {
+            for(let i = callbacks.length - 1; i >= 0; i--) {
+                if(callbacks[i].id == callbackId) {
+                    callbacks.splice(i, 1);
+                }
+            }
+        }
+        callbacks.push({value: value, func: func, id: callbackId});
+    }
+
+    getHeader() {
+        const contentType = this.contentType;
+        if(!contentType) {
+            contentType = "application/json;charset=UTF-8";
+        }
+        return { "Content-Type": contentType };
+    }
+    getRequestConfig() {
+        return {headers: this.getHeader()};
+    }
+
     handleResponse(response) {
         return response.data;
     }
@@ -47,26 +124,26 @@ class Client {
 }
 class FOClient extends Client {}
 class BOClient extends Client {
-    static {
-        this.setMetaObject({});
-    }
-    static setMetaObject(meta) {
-        const proto = BOClient.prototype;
-        for(const key in meta) {
-            Object.defineProperty(proto, key, {
-                get: function() { return proto.meta[key]; }
-            })
+    constructor(config) {
+        super(config);
+        const cfg = this.store;
+        if(!cfg.axios) {
+            const axiosConfig = {
+                baseURL: cfg.baseURL,
+                timeout: cfg.timeout ? cfg.timeout : 1000,
+                withCredentials: cfg.withCredentials ? true : false
+            };
+            cfg.axios = axios.create(axiosConfig);
         }
-        meta.proto = proto;
-        proto.on = {};
-        proto.meta = meta;
     }
-    constructor() {
-        super();
-        this.axios = axios.create({
-            baseURL: 'http://localhost:8080/rest/s1/foi',
-            //timeout: 1000,
-            withCredentials: true
+    get postalAddressMap() {
+        return this.store.postalAddressMap;
+    }
+    saveShippingAddrress(address) {
+        const self = this;
+        return this.put("/customer/shippingAddresses", address).then((data) => {
+            self.postalAddressMap[data.postalContactMechId] = data;
+            return data;
         });
     }
     getCountries() {
@@ -81,124 +158,154 @@ class BOClient extends Client {
     getLocale() {
         return this.get("/locale");
     }
-
-    setMetaProperty(key, value) {
-        const meta = this.meta;
-        const oldVal = meta[key];
-        const proto = meta.proto;
-        // const oldVal = meta[key];
-        meta[key] = value;
-        if(!proto.hasOwnProperty(key)) {
-            Object.defineProperty(proto, key, {
-                get: function() { return proto.meta[key]; }
-            })
-        }
-        let callbackStack = proto.on[key];
-        if(callbackStack && oldVal != value) {
-            invokeCallbackStack(callbackStack, value);
-        }
-    }
-    addCallback(func, key, value = null, callbackId = null) {
-        const meta = this.meta;
-        //const oldVal = meta[key];
-        const proto = meta.proto;
-        if(proto.on[key] == null) {
-            proto.on[key] = [];
-        }
-        const callbacks = proto.on[key];
-        if(callbackId) {
-            for(let i = callbacks.length - 1; i >= 0; i--) {
-                if(callbacks[i].id == callbackId) {
-                    callbacks.splice(i, 1);
-                }
-            }
-        }
-        callbacks.push({value: value, func: func, id: callbackId});
-    }
-
-    getRequestConfig() {
-
+    getHeader() {
         let headers = { 
-            "Content-Type": "application/json;charset=UTF-8", 
-            "store": this.store, 
-            "moquiSessionToken": Alpine.raw(this.token), 
+            "Content-Type": this.contentType, 
+            "store": this.storeId, 
+            "moquiSessionToken": this.token, 
             "SessionToken" : this.token, 
             "X-CSRF-Token": this.token 
         };
         if(this.apiKey != null) {
             headers["api_key"] = this.apiKey;
         }
-        return {headers: headers};
+        return headers;
     }
 }
 
 class UserAccount extends BOClient {
-    constructor() {
-        super();
-        this.postalAddressMap = {};
+    static CONFIG_KEYS = ["username", "userId", "partyId", "firstName", "lastName", "emailAddress", "locale"];
+    constructor(userInfo) {
+        super(userInfo);
+        const self = this;
+        for(const key of UserAccount.CONFIG_KEYS) {
+            Object.defineProperty(self, key, {
+                get: function() { return self.store[key]; },
+                set: function(value) { 
+                    self.setConfig(key, value);
+                }
+            })
+        }
+    }
+    login(loginData) {
+        const self = this;
+        if(!loginData.username) {
+            return this.post("/loginAnonymous", loginData).then((data) => {
+                data.loggedIn = true;
+                self.setInfo(data);
+                return self;
+            });
+        }
+        return this.post("/login", loginData).then((data) => {
+                data.loggedIn = true;
+                self.setInfo(data);
+                return self;
+            });
+    }
+    logout() {
+        const self = this;
+        return this.get("/logout").then(() => {
+            self.setInfo({moquiSessionToken: self.defaultToken, loggedIn: false});
+            return self;
+        })
     }
 
     setInfo(data) {
-        if(data.moquiSessionToken) {
-            this.setMetaProperty("token", data.moquiSessionToken);
-        }
-        if(data.apiKey) {
-            this.setMetaProperty("apiKey", data.apiKey);
-        }
+        if(!data) data = {};
 
-        let cInfo = data.customerInfo;
-        this.username = !cInfo.username ? "" : cInfo.username;
-        this.userId = !cInfo.userId ? "" : cInfo.userId;
-        this.partyId = !cInfo.partyId ? "" : cInfo.partyId;
-        this.firstName = !cInfo.firstName ? "" : cInfo.firstName;
-        this.lastName = !cInfo.lastName ? "" : cInfo.lastName;
-        this.locale = !cInfo.locale ? "" : cInfo.locale;
-        this.emailAddress = !cInfo.emailAddress ? "" : cInfo.emailAddress;
-        //this.postalAddressList = cInfo.postalAddressList ? cInfo.postalAddressList : [];
-        if(cInfo.postalAddressList) {
-            for(const postalAddress of cInfo.postalAddressList) {
-                this.postalAddressMap[postalAddress.postalContactMechId] = postalAddress;
-            }
-        }
-    }
-
-    logout() {
-        const ua = this;
-        return this.get("/logout")
-        .then(() => {
-            ua.setMetaProperty("token", sessionToken);
-            ua.setMetaProperty("apiKey", '');
-            ua.setMetaProperty("loggedIn", false);
-            ua.username = '';
-            ua.userId = '';
-            ua.partyId = '';
-            ua.firstName = '';
-            ua.lastName = '';
-            ua.locale = '';
-            ua.emailAddress = '';
-            ua.contactMechId = '';
-            ua.contactNumber = '';
+        this.loggedIn = data.loggedIn ? true : false;
+        this.token = data.moquiSessionToken;
+        this.apiKey = data.apiKey;
         
-        })
-        .catch((error) => {
-            return {error: error.message }; //TODO: , statusCode: error.??
-        });
+        let cInfo = data.customerInfo;
+        if(!cInfo) cInfo = {};
+        const postalAddressList = cInfo.postalAddressList;
+        const postalAddressMap = this.postalAddressMap;
+        if(!postalAddressList || postalAddressList.length == 0) {
+            Object.keys(postalAddressMap).forEach(key => delete postalAddressMap[key]);
+            return;
+        };
+
+        for(const postalAddress of postalAddressList) {
+            postalAddressMap[postalAddress.postalContactMechId] = postalAddress;
+        }
+
+        for(const key of UserAccount.CONFIG_KEYS) {
+            this[key] = cInfo[key];
+        }
     }
+
     register() {
         //TODO 
     }
 }
 class Cart extends BOClient {
-    constructor() {
-        super();
-        this.setMetaProperty("isCartLoaded", false);
+    constructor(cartInfo) {
+        super(cartInfo);
         const self = this;
-        this.addCallback(()=>{self.reset(); return true; }, "loggedIn", false, "resetCart");
-        this.addLoadCallback();
-    }
-    addLoadCallback() {
-        const self = this;
+        this.addCallback(()=>{self.reset(); return Promise.resolve(true); }, "loggedIn", false, "resetCart");
         this.addCallback(()=>{return self.load().then(() => true); }, "loggedIn", true, "loadCart");
+    }
+    get isCartLoaded() {
+        return this.store.isCartLoaded;
+    }
+    set isCartLoaded(isCartLoaded) {
+        this.setConfig("isCartLoaded", isCartLoaded ? true : false);
+    }
+    get paymentsTotal() {
+        return this.store.paymentsTotal;
+    }
+    set paymentsTotal(total) {
+        this.setConfig("paymentsTotal", total, 0);
+    }
+    get totalUnpaid() {
+        return this.store.totalUnpaid;
+    }
+    set totalUnpaid(total) {
+        this.setConfig("totalUnpaid", total, 0);
+    }
+    get productsQuantity() {
+        return this.store.productsQuantity;
+    }
+    set productsQuantity(quantity) {
+        this.setConfig("productsQuantity", quantity, 0);
+    }
+    
+    get orderPromoCodeDetailList() {
+        return this.store.orderPromoCodeDetailList;
+    }
+    set orderPromoCodeDetailList(list) {
+        this.setConfig("orderPromoCodeDetailList", list, []);
+    }
+    get paymentInfoList() {
+        return this.store.paymentInfoList;
+    }
+    set paymentInfoList(list) {
+        this.setConfig("paymentInfoList", list, []);
+    }
+    get orderItemList() {
+        return this.store.orderItemList;
+    }
+    set orderItemList(list) {
+        this.setConfig("orderItemList", list, []);
+    }
+    get orderItemWithChildrenSet() {
+        return this.store.orderItemWithChildrenSet;
+    }
+    set orderItemWithChildrenSet(list) {
+        this.setConfig("orderItemWithChildrenSet", list, []);
+    }
+    get orderHeader() {
+        return this.store.orderHeader;
+    }
+    set orderHeader(orderHeader) {
+        this.setConfig("orderHeader", orderHeader, {});
+    }
+    get orderPart() {
+        return this.store.orderPart;
+    }
+    set orderPart(orderPart) {
+        this.setConfig("orderPart", orderPart, {});
     }
 
     assign(data) {
@@ -224,16 +331,15 @@ class Cart extends BOClient {
         this.orderHeader = {};
     }
     load() {
-        const self = this;
         if(!this.loggedIn) {
-            alert("Cart is not loaded");
-            return self;
+            return this;
         }
+        const self = this;
         return this.get("/cart/info?timeStamp\x3d" + (new Date).getTime())
                 .then((data) => {
                     self.reset();
                     self.assign(data);
-                    self.setMetaProperty("isCartLoaded", true);
+                    self.isCartLoaded = true;
                     return self;
                 });
     }
@@ -271,13 +377,18 @@ class Cart extends BOClient {
         if(this.ortherPart && this.ortherPart.orderPartSeqId) {
             body.orderPartSeqId = this.ortherPart.orderPartSeqId;
         }
-        return this.post("/cart/checkout", body, this.getRequestConfig()).then(function (data) {
+        return this.post("/cart/checkout", body, this.store.requestConfig).then(function (data) {
             self.paymentId = data.paymentId;
             self.paypalOrderId = data.paypalOrderId;
             return data.paypalOrderId;
         });
     }
     place(data) {
+        const self = this;
+        return self.post("/cart/place", data).then((response) => {
+            self.reset(); 
+            return response;
+        });
     }
 
 }
@@ -288,9 +399,8 @@ class LazyList extends BOClient {
     }
 }
 
-class Executor extends BOClient {
+class Executor {
     constructor(callable) {
-        super()
         this.callable = callable;
         this.isDone = false;
     }
@@ -371,9 +481,9 @@ class Dialog extends Closable {
 
 
 class LoginForm extends Dialog {
-    constructor(userAccount, dialog, componentUrl) {
+    constructor(userInfo, dialog, componentUrl) {
         super(dialog, null, componentUrl);
-        this.userAccount = userAccount;
+        this.userAccount = new UserAccount(userInfo);
         this.errorMsg = "";
         this.isDone = this.userAccount.loggedIn;
         this.username = this.userAccount.username;
@@ -385,56 +495,60 @@ class LoginForm extends Dialog {
         return super.init();
     }
 
-    doLogin(url, loginData) {
+    doLogin(loginData) {
         this.isLoading = true;
         const self = this;
-        const userAccount = this.userAccount;
-        return this.post(url, loginData)
-            .then((data) => {
-                userAccount.setInfo(data);
+        return this.userAccount.login(loginData)
+            .then((userAccount) => {
+                self.userAccount = userAccount;
                 self.errorMsg = "";
                 self.invoke();
-                userAccount.setMetaProperty("loggedIn", true);
+                return this.userAccount;
             })
             .catch((error) => {
-                this.errorMsg = error.message;
-                alert(this.errorMsg);
+                self.errorMsg = error.message;
+                alert(self.errorMsg);
+                return null;
             });
     }
     login() {
         if (this.username.length < 3 || this.password.length < 3) {
             this.errorMsg = "Username or password is missing";
             alert(this.errorMsg);
-            return;
+            return null;
         }
-        return this.doLogin("/login", { username: this.username, password: this.password });
+        return this.doLogin({ username: this.username, password: this.password });
     }
     loginAnonymous() {
-        return this.doLogin("/loginAnonymous", {});
+        return this.doLogin({});
     }
 }
 
 class AddressForm extends Dialog {
-    constructor(dialog, button, componentUrl, addressInfo) {
+    constructor(dialog, button, componentUrl, addressClient) {
         super(dialog, button, componentUrl);
-        this.addressInfo = addressInfo ? addressInfo : this.newAddressInfo();
-        for(let fieldName of this.getAddressFields()) {
-            this[fieldName] = "";
+        this.client = addressClient;
+        this.addressMap = this.client.postalAddressMap;
+        let addressInfo = null;
+        for(const address in this.addressMap) {
+            addressInfo = address;
+            break;
         }
-        for(let fieldName of this.getTelecomFields()) {
-            this[fieldName] = "";
-        }
-        this.emailAddress = "";
-        this.postalContactMechId = "_NA_";
-        this.countryGeoId = "_NA_";
-        this.stateProvinceGeoId = "_NA_"
-        this.telecomContactMechId = "";
-        this.emailContactMechId = "";
-        this.emailAddress = "";
-        this.addressMap = {};
+        this.setAddressInfo(addressInfo);
     }
     newAddressInfo() {
-        return {postalContactMechPurposeId: "PostalShippingDest", postalAddress: {}, telecomNumber: {}};
+        return {
+            emailAddress: "",
+            postalContactMechId: "_NA_",
+            countryGeoId: "_NA_",
+            stateProvinceGeoId: "_NA_",
+            telecomContactMechId: "",
+            emailContactMechId: "",
+            emailAddress: "",
+            postalContactMechPurposeId: "PostalShippingDest", 
+            postalAddress: {}, 
+            telecomNumber: {}
+        };
     }
     setAddressInfo(addressInfo) {
         if(this.isChanged) {
@@ -445,7 +559,7 @@ class AddressForm extends Dialog {
                 }
             }    
         }
-        if(!this.addressInfo) {
+        if(!addressInfo) {
             addressInfo = this.newAddressInfo();
         }
 
@@ -489,7 +603,7 @@ class AddressForm extends Dialog {
         for(let fieldName of addressFields) {
             postalAddress[fieldName] = this[fieldName];
         }
-        if(!postalAddress.contactMechId) {
+        if(!hasValue(postalAddress, "contactMechId")) {
             postalAddress.contactMechId = data.postalContactMechId;
         }
 
@@ -498,15 +612,14 @@ class AddressForm extends Dialog {
         for(let fieldName of telecomFields) {
             telecomNumber[fieldName] = this[fieldName];
         }
-        if(!telecomNumber.contactMechId) {
+        if(!hasValue(telecomNumber, "contactMechId")) {
             telecomNumber.contactMechId = data.telecomContactMechId;
         }
 
-        if(!addressInfo.postalContactMechId) {
+        if(!hasValue(addressInfo, "postalContactMechId")) {
             addressInfo.postalContactMechId = data.postalContactMechId;
             addressInfo.telecomContactMechId = data.telecomContactMechId;
             addressInfo.emailContactMechId = data.emailContactMechId;
-            this.addressMap[addressInfo.postalContactMechId] = addressInfo;
         }
     }
     getDirtyObj() {
@@ -546,7 +659,7 @@ class AddressForm extends Dialog {
             const isSubLoadingProcess = this.isLoading;
             this.isLoading = true;
             const self = this;
-            return this.put("/customer/shippingAddresses", dirtyObj)
+            return this.client.saveShippingAddrress(dirtyObj)
                 .then((data) => {
                     self.onUpdated(data); 
                     if(!isSubLoadingProcess) self.invoke();
@@ -562,8 +675,7 @@ class AddressForm extends Dialog {
 }
 class CheckoutForm extends AddressForm{
     constructor(cartInfo, dialog, button, componentUrl) {
-        super(dialog, button, componentUrl);
-        this.cartInfo = cartInfo;
+        super(dialog, button, componentUrl, new Cart(cartInfo));
     }
     init() {
         const self = this;
@@ -575,10 +687,10 @@ class CheckoutForm extends AddressForm{
         });
     }
     open() {
-        const cartInfo = this.cartInfo;
+        const cartInfo = this.client;
         if(!this.loggedIn) {
             const self = this;
-            this.cartInfo.addCallback(() => {self.open();}, "isCartLoaded", true);
+            this.client.addCallback(() => {self.open();}, "isCartLoaded", true);
             if(this.loginForm) this.loginForm.open();
             else alert("Cart is not loaded");
             return;
@@ -596,7 +708,7 @@ class CheckoutForm extends AddressForm{
         paymentData.telecomContactMechId = addressInfo.telecomContactMechId;
         paymentData.carrierPartyId = this.carrierPartyId;
         paymentData.shipmentMethodEnumId = this.shipmentMethodEnumId;
-        return this.cartInfo.checkout(paymentData);
+        return this.client.checkout(paymentData);
     }
     checkout(paymentData) {
         this.isLoading = true;
@@ -640,8 +752,8 @@ class CheckoutForm extends AddressForm{
 //     "facilitatorAccessToken": "A21AAL-yxW0sexl-0Erd3Dk8Ek3lek3zwlvHWmy2Y3Fq3Ziu9wruFIY917eJ7cylrTUY3Mb3AfFuGAh-5CIO4lG6yOu85LxQw",
 //     "paymentSource": "card"
 // }
-                return self.post("/cart/place", data)
-                            .then(() => {self.cartInfo.reset(); self.close(); })
+                return self.client.place(data)
+                            .then((response) => { self.close(); })
                             .catch(error => alert(error.message));
             },
             onError: function (error) {

@@ -3,7 +3,7 @@
         <div class="bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 w-full sm:w-auto sm:min-w-[300px] sm:top-0 lg:min-w-[370px] flex flex-col flex-nowrap">
             <div class="px-4 py-8 sm:overflow-auto sm:h-[calc(100vh-60px)] mb-auto">
                 <div class="space-y-4">
-                    <template x-for="orderItem in cartInfo.orderItemList">
+                    <template x-for="orderItem in client.orderItemList">
                         <div x-data="orderItem" class="flex items-start gap-4">
                             <div class="w-32 h-32 max-lg:w-24 max-lg:h-24 flex shrink-0 bg-gray-300 rounded-md">
                                 <img :src="image"
