@@ -186,6 +186,7 @@ class UserAccount extends BOClient {
                 }
             })
         }
+        this.setInfo(userInfo);
     }
     login(loginData) {
         const self = this;
@@ -207,7 +208,7 @@ class UserAccount extends BOClient {
         return this.get("/logout").then(() => {
             self.setInfo({moquiSessionToken: self.defaultToken, loggedIn: false});
             return self;
-        })
+        });
     }
 
     setInfo(data) {
@@ -219,16 +220,17 @@ class UserAccount extends BOClient {
         
         let cInfo = data.customerInfo;
         if(!cInfo) cInfo = {};
-        const postalAddressList = cInfo.postalAddressList;
         const postalAddressMap = this.postalAddressMap;
-        if(!postalAddressList || postalAddressList.length == 0) {
+        if(postalAddressMap) {
             Object.keys(postalAddressMap).forEach(key => delete postalAddressMap[key]);
-            return;
-        };
-
-        for(const postalAddress of postalAddressList) {
-            postalAddressMap[postalAddress.postalContactMechId] = postalAddress;
         }
+
+        const postalAddressList = cInfo.postalAddressList;
+        if(postalAddressList && postalAddressList.length > 0) {
+            for(const postalAddress of postalAddressList) {
+                postalAddressMap[postalAddress.postalContactMechId] = postalAddress;
+            }
+        };
 
         for(const key of UserAccount.CONFIG_KEYS) {
             this[key] = cInfo[key];
@@ -236,7 +238,21 @@ class UserAccount extends BOClient {
     }
 
     register() {
-        //TODO 
+        const userInfo = {
+            firstName: this.firstName,
+            middleName: this.middleName,
+            lastName: this.lastName,
+            username: this.username,
+            emailAddress: this.emailAddress,
+            newPassword: this.newPassword,
+            newPasswordVerify: this.newPasswordVerify
+        };
+        const self = this;
+        return this.post("/register", userInfo).then((data) => {
+            data.loggedIn = true;
+            self.setInfo(data);
+            return self;
+        });
     }
 }
 class Cart extends BOClient {
