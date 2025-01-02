@@ -214,7 +214,6 @@ class UserAccount extends BOClient {
     setInfo(data) {
         if(!data) data = {};
 
-        this.loggedIn = data.loggedIn ? true : false;
         this.token = data.moquiSessionToken;
         this.apiKey = data.apiKey;
         
@@ -235,6 +234,7 @@ class UserAccount extends BOClient {
         for(const key of UserAccount.CONFIG_KEYS) {
             this[key] = cInfo[key];
         }
+        this.loggedIn = data.loggedIn ? true : false;
     }
 
     register() {
@@ -706,7 +706,7 @@ class CheckoutForm extends AddressForm{
         const cartInfo = this.client;
         if(!this.loggedIn) {
             const self = this;
-            this.client.addCallback(() => {self.open();}, "isCartLoaded", true);
+            this.client.addCallback(() => {self.open(); return Promise.resolve(false); }, "isCartLoaded", true);
             if(this.loginForm) this.loginForm.open();
             else alert("Cart is not loaded");
             return;
