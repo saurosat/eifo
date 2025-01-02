@@ -216,7 +216,8 @@ class UserAccount extends BOClient {
 
         this.token = data.moquiSessionToken;
         this.apiKey = data.apiKey;
-        
+        this.loggedIn = data.loggedIn ? true : false;
+
         let cInfo = data.customerInfo;
         if(!cInfo) cInfo = {};
         const postalAddressMap = this.postalAddressMap;
@@ -234,7 +235,6 @@ class UserAccount extends BOClient {
         for(const key of UserAccount.CONFIG_KEYS) {
             this[key] = cInfo[key];
         }
-        this.loggedIn = data.loggedIn ? true : false;
     }
 
     register() {
@@ -261,6 +261,9 @@ class Cart extends BOClient {
         const self = this;
         this.addCallback(()=>{self.reset(); return Promise.resolve(true); }, "loggedIn", false, "resetCart");
         this.addCallback(()=>{return self.load().then(() => true); }, "loggedIn", true, "loadCart");
+    }
+    get isLoggedIn() {
+        return this.store.isLoggedIn;
     }
     get isCartLoaded() {
         return this.store.isCartLoaded;
@@ -704,12 +707,16 @@ class CheckoutForm extends AddressForm{
     }
     open() {
         const cartInfo = this.client;
-        if(!this.loggedIn) {
-            const self = this;
-            this.client.addCallback(() => {self.open(); return Promise.resolve(false); }, "isCartLoaded", true);
-            if(this.loginForm) this.loginForm.open();
-            else alert("Cart is not loaded");
-            return;
+        if(!this.client.isCartLoaded) {
+            if(!this.client.isLoggedIn) {
+                if(this.loginForm) this.loginForm.open();
+                else alert("Cart is not loaded");
+                // const self = this;
+                // this.client.addCallback(() => {self.open(); return Promise.resolve(false); }, "isCartLoaded", true);
+                return;
+            } else {
+                this.client.load();
+            }
         }
         super.open();
     }
