@@ -24,6 +24,17 @@ function logout() {
     });
 }
 
+var loginForm = null;
+function getLoginForm(dialog, componentUrl) {
+    if(!loginForm) {
+        loginForm = new LoginForm(Alpine.store('boConfig'));
+        loginForm.setDialog(dialog);
+        loginForm.setComponentUrl(componentUrl);
+    }
+    return loginForm;
+}
+
+
 document.addEventListener('alpine:init', () => {
     Alpine.store('boConfig', {
         on: {},
@@ -60,18 +71,13 @@ document.addEventListener('alpine:init', () => {
     });
 
 
-    window.loginForm = new LoginForm(Alpine.store('boConfig'));
-    Alpine.data('userLogin', (dialog, componentUrl) => {
-        window.loginForm.setDialog(dialog);
-        window.loginForm.setComponentUrl(componentUrl);
-        return loginForm;
-    });
-
-    window.checkoutForm = new CheckoutForm(Alpine.store('boConfig'));
-    window.checkoutForm.loginForm = window.loginForm;
     Alpine.data('cartDialog', (ele, btn) => { 
-        window.checkoutForm.setDialog(ele);
-        window.checkoutForm.setButton(btn);
+        if(!window.checkoutForm) {
+            window.checkoutForm = new CheckoutForm(Alpine.store('boConfig'));
+            window.checkoutForm.loginForm = window.loginForm;
+            window.checkoutForm.setDialog(ele);
+            window.checkoutForm.setButton(btn);
+        }
         return window.checkoutForm; 
     });
 

@@ -6,66 +6,75 @@
 
 local utils = eifo.utils
 local lock = require "eifo.lock"
+local template = require("resty.template")
+template.load = function (view, plain)
+    if plain == true then return view end
+    local route, params, noLayout = eifo.route:getRoute(view)
+    local content, filePath = route:loadFromFile(params, noLayout)
+    if not content then
+        local status
+        content, status = route:render(params, noLayout)
+        if not content or status < 200 or status >= 400 then
+            ngx.log(ngx.ERR, "Cannot render layout "..view)
+            return view
+        end
+        route:saveToFile(content, params, noLayout, filePath)
+    end
+    return content
+end
 local ngx = ngx
 
-local _view = setmetatable({}, {__index = {
-    _update = function ()
-        ngx.log(ngx.WARN, "_update() is not implemented")
-    end
-}})
+local _view = setmetatable({}, 
+    {
+        __index = {
+            _update = function ()
+                ngx.log(ngx.WARN, "_update() is not implemented")
+            end
+        },
+        __eq = function (v1, v2)
+            return v1 and v2 and v1.name == v2.name
+        end
+    }
+)
 
-function _view:new(paths, viewFile)
-    local view = setmetatable({}, self)
+function _view:new(viewInfo)
+    local view = setmetatable(viewInfo or {}, self)
     self.__index = self
 
-    view.template = viewFile
-    -- local _, startPos = string.find(modelFile, "/lua/view/") 
-    local package = "view"
-    for i = 1, #paths, 1 do
-        package = package.."."..paths[i]
-    end
-    view._observerId = package
-    local viewInfo = require(package)
-    if not viewInfo or type(viewInfo) ~= "table" then
-        return nil
-    end
     local tableDef = viewInfo.tableDef 
                     or assert(viewInfo.tableName and eifo.db.table[viewInfo.tableName])
     ngx.log(ngx.DEBUG, "ViewInfo: "..utils.toJson(viewInfo))
     view.table = tableDef:new({
-        -- leftColumns = viewInfo.leftColumns,
-        -- rightColumns = viewInfo.rightColumns,
-        -- skippedTables = viewInfo.skippedTables,
         toJsonColumns = viewInfo.toJsonColumns,
     })
-    view.name = paths[#paths]
-    --view.loadData = viewInfo.loadData
-    view.layout = viewInfo.layout
-    view.layoutUri = viewInfo.layoutUri
-    view.key = viewInfo.key
-    if view.key then
-        paths[#paths] = nil
+    local layoutType = type(view.layout)
+    if layoutType == "string" then
+        view.layoutUri = view.layout
+        view.layout = nil
     end
-    view.toJson = viewInfo.toJson
-    if viewInfo.outputFile then
-        local outPath = eifo.basePath.."/home"
-        for i = 1, #paths, 1 do
-            if paths[i] ~= "index" then
-                outPath = outPath.."/"..paths[i]
-                -- check if location exists:
-                local ok, _, code = os.rename(outPath, outPath)
-                if not ok and code ~= 13 then
-                    -- if not, create the dir
-                    os.execute("mkdir "..outPath)
-                    os.execute("mkdir "..outPath.."/no_layout")
-                end
-            end
-        end
-        view.outPath = outPath
-        view.table:_attach(view)
+    return view
+end
+_view.loadView = function(self, fullName, templatePath)
+    local viewInfo = require(fullName)
+    if not viewInfo or type(viewInfo) ~= "table" then
+        return nil
     end
-    view.paths = paths
 
+    local view = self:new(viewInfo)
+    view.name = fullName
+    view.contentType = "application/json; charset=utf-8"
+    if not templatePath then
+        return view
+    end
+    
+    ngx.log(ngx.INFO, "Initializing template file "..templatePath)
+    local content, err = utils.read_file(templatePath)
+    if not content then
+        ngx.log(ngx.ERR, "Failed to  Initialized template "..templatePath..": "..err)
+        return view
+    end
+    view.template = template.compile(content, "no-cache", true)
+    view.contentType = "text/html; charset=utf-8"
     return view
 end
 
@@ -77,139 +86,51 @@ _view.getConn = function (...)
     conn:connect()
     return conn
 end
-_view.getOutFile = function(self, key, noLayout)
-    local sub = noLayout and "/no_layout/" or "/"
+_view.getKey = function (self, params)
     if self.key then
-        return self.outPath..sub..self.name..".html"
-    end
-    return self.outPath..sub..key..".html"
-end
-
-_view._update = function(self, records, oldVals, newVals) --TODO: 
-    local record = records[1]
-    local outFile = self:getOutFile(record.key)
-    local lockObj = lock(outFile)
-    if lockObj then
-        os.remove(outFile) --> the updater should remove this lock
-    end
-
-    outFile = self:getOutFile(record.key, true)
-    lockObj = lock(outFile)
-    if lockObj then
-        os.remove(outFile)
-    end
-end
-
-_view.process = function(self, params, noLayout)
-    ngx.log(ngx.INFO, (self.name or "root")..": "..table.concat(params, ","))
-    local numParams = (params and #params) or 0
-    
-    local conn = self:getConn()
-    if not conn then
-        utils.responseError(500, "Got some problems! We will fix it soon. Please come back later")
-        return
-    end
-    conn:connect()
-    -- Start Edited Aug 7
-    --local model, key, err = self:loadData(params, conn)
-    -- conn:disconnect()
-    if self.key then
-        params.key = self.key
-    elseif #params == 1 then
-        params.key = params[1]
+        return self.key
     end
     if not params or not next(params) then
-        utils.responseError(ngx.HTTP_BAD_REQUEST, "No search params")
-        return
+        return nil
     end
+    return params.key or (#params == 1 and params[1]) or self.table:generateKey(params)
+end
+_view.render = function(self, params, noLayout)
+    local key = self:getKey(params)
+    if not key then
+        ngx.log(ngx.INFO, (self.name or "root")..": No search params")
+        return nil, ngx.HTTP_BAD_REQUEST
+    end
+
+    local conn = self:getConn()
+    if not conn then
+        ngx.log(ngx.ERR, (self.name or "root")..": Cannot get connection")
+        return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
+    end
+    conn:connect()
     local model = self.table:new({conn = conn})
-    local key = self.table:generateKey(params)
-    ngx.log(ngx.DEBUG, "Loading key "..key)
+    ngx.log(ngx.DEBUG, (self.name or "root")..": Loading key "..key)
     local record, err = model:loadByKey(key)
     if not record then
         ngx.log(ngx.INFO, err)
-        utils.responseError(ngx.HTTP_NOT_FOUND, "Page not found ")
-        return
+        conn:disconnect()
+        return nil, ngx.HTTP_NOT_FOUND
     end
-    -- End Edited Aug 7
 
-    local renderedText = self:render(record, noLayout)
-    ngx.header.content_type = self.contentType
-    ngx.send_headers()
-    ngx.print(renderedText)
-    ngx.eof()
-
-    if self.outPath then
-        local outPathFile = self:getOutFile(key, noLayout)
-        local fLock = lock(outPathFile)
-        if fLock then -- write renderedText to a static file 
-            local f = assert(io.open(outPathFile, "w"))
-            f:write(renderedText)
-            f:close()
-            fLock:unlock()
-        end
+    if not self.template then
+        return self.toJson and self:toJson(record) or record:toJson(), ngx.HTTP_OK, "application/json"
     end
+    local sHtml = self.template({record = record, main = "{* main *}"}) --> main for layout pre-compile
+    if noLayout or not (self.layoutUri or self.layout) then
+        return sHtml, ngx.HTTP_OK, "text/html"
+    end
+    self.layout = self.layout or (self.layoutUri and template.compile(self.layoutUri))
+    if self.layout then
+        sHtml = self.layout({main = sHtml, record = record})
+    end
+
     conn:disconnect()
+    return sHtml, ngx.HTTP_OK
 end
--- _view.loadData = function(self, params, conn)
---     local model, key
---     if self.key then
---         params = {key = self.key}
---     elseif #params == 1 then
---         params = {key = params[1]}
---     elseif not params or #params == 0 then
---         return nil, nil, "No search params"
---     end
---     if self.table then
---         model = self.table:new()
---         model:init()
---         key = self.table:generateKey(params)
---         ngx.log(ngx.DEBUG, "Loading key "..key)
---         local record, err = model:load({key = key}, conn)
---         if not record then
---             err = err or "No records found. Please check maxLevel setting"
---             return nil, nil, err
---         end
---     end
---     return model, key
--- end
-_view.render = function(self, record, noLayout)
-
-    record = record or {}
-
-    local reqHeaders = ngx.req.get_headers()
-    ngx.log(ngx.DEBUG, "\r\n\r\n Rendering: "..(record and utils.toJson(record) or "record is nil"))
-    if self.template then
-        local template = require("resty.template")
-        local fn = template.compile(self.template, "no-cache")
-        local sHtml = fn({record = record, main = "{* main *}"}) --> main for layout pre-compile
-        -- ngx.log(ngx.DEBUG, sHtml)
-        if noLayout or not (self.layoutUri or self.layout) then
-            return sHtml
-        end
-        local fnLayout
-        if self.layoutUri then
-            ngx.req.read_body()
-            --ngx.location.capture.options= 
-            local res = ngx.location.capture(self.layoutUri, 
-                {copy_all_vars = false,
-                share_all_vars = false, 
-                always_forward_body = false, 
-                method = ngx.HTTP_GET, 
-                args = {}, body = "", ctx = {}, vars = {}})
-            local sLayout = res.body
-            fnLayout = template.compile(sLayout, true)
-        else
-            fnLayout = template.compile(self.layout)
-        end
-        --ngx.log(ngx.DEBUG, utils.toJson(fnLayout))
-        return fnLayout({main = sHtml, record = record})
-    end
-    if self.toJson then
-        return self:toJson(record)
-    end
-    return record:toJson()
-end
-
 
 return _view

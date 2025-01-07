@@ -34,7 +34,7 @@ class Client {
         if(!defaultToken) defaultToken = Client.EMPTY_STR;
         this.defaultToken = defaultToken;
     }
-    setConfig(key, value, defaultValue = Client.EMPTY_STR) {
+    storeValue(key, value, defaultValue = Client.EMPTY_STR) {
         if(value === null || value === undefined) value = defaultValue;
         const cfg = this.store;
         const oldVal = cfg[key];
@@ -62,19 +62,19 @@ class Client {
         return this.store.token;
     }
     set token(tokenStr) {
-        this.setConfig("token", tokenStr, this.defaultToken);
+        this.storeValue("token", tokenStr, this.defaultToken);
     }
     get apiKey() {
         return this.store.apiKey;
     }
     set apiKey(apiKey) {
-        this.setConfig("apiKey", apiKey);
+        this.storeValue("apiKey", apiKey);
     }
     get loggedIn() {
         return this.store.loggedIn;
     }
     set loggedIn(isLoggedIn) {
-        this.setConfig("loggedIn", isLoggedIn ? true : false);
+        this.storeValue("loggedIn", isLoggedIn ? true : false);
     }
     addCallback(func, key, value = null, callbackId = null) {
         const cfg = this.store;
@@ -136,8 +136,33 @@ class BOClient extends Client {
             cfg.axios = axios.create(axiosConfig);
         }
     }
+    get isLoggedIn() {
+        return this.store.isLoggedIn;
+    }
+
     get postalAddressMap() {
         return this.store.postalAddressMap;
+    }
+    clearPostalAddressMap() {
+        const postalAddressMap = this.store.postalAddressMap;
+        if(postalAddressMap) {
+            Object.keys(postalAddressMap).forEach(key => delete postalAddressMap[key]);
+        }
+
+    }
+    addPostalAddresses(postalAddressList) {
+        if(!postalAddressList || postalAddressList.length <= 0) {
+            console.log("postalAddressList is null or undefined or empty");
+            return;
+        };
+        const postalAddressMap = this.store.postalAddressMap;
+        if(postalAddressMap === null || postalAddressMap === undefined) {
+            console.log("postalAddressMap is null or undefined");
+            return;
+        }
+        for(const postalAddress of postalAddressList) {
+            postalAddressMap[postalAddress.postalContactMechId] = postalAddress;
+        }
     }
     saveShippingAddrress(address) {
         const self = this;
@@ -177,16 +202,49 @@ class UserAccount extends BOClient {
     static CONFIG_KEYS = ["username", "userId", "partyId", "firstName", "lastName", "emailAddress", "locale"];
     constructor(userInfo) {
         super(userInfo);
-        const self = this;
-        for(const key of UserAccount.CONFIG_KEYS) {
-            Object.defineProperty(self, key, {
-                get: function() { return self.store[key]; },
-                set: function(value) { 
-                    self.setConfig(key, value);
-                }
-            })
-        }
         this.setInfo(userInfo);
+    }
+    get username() {
+        return this.store.username;
+    }
+    set username(value) {
+        this.storeValue("username", value);
+    }
+    get userId() {
+        return this.store.userId;
+    }
+    set userId(value) {
+        this.storeValue("userId", value);
+    }
+    get partyId() {
+        return this.store.partyId;
+    }
+    set partyId(value) {
+        this.storeValue("partyId", value);
+    }
+    get firstName() {
+        return this.store.firstName;
+    }
+    set firstName(value) {
+        this.storeValue("firstName", value);
+    }
+    get lastName() {
+        return this.store.lastName;
+    }
+    set lastName(value) {
+        this.storeValue("lastName", value);
+    }
+    get emailAddress() {
+        return this.store.emailAddress;
+    }
+    set emailAddress(value) {
+        this.storeValue("emailAddress", value);
+    }
+    get locale() {
+        return this.store.locale;
+    }
+    set locale(value) {
+        this.storeValue("locale", value);
     }
     login(loginData) {
         const self = this;
@@ -213,28 +271,17 @@ class UserAccount extends BOClient {
 
     setInfo(data) {
         if(!data) data = {};
-
-        this.token = data.moquiSessionToken;
-        this.apiKey = data.apiKey;
-        this.loggedIn = data.loggedIn ? true : false;
-
         let cInfo = data.customerInfo;
         if(!cInfo) cInfo = {};
-        const postalAddressMap = this.postalAddressMap;
-        if(postalAddressMap) {
-            Object.keys(postalAddressMap).forEach(key => delete postalAddressMap[key]);
-        }
 
-        const postalAddressList = cInfo.postalAddressList;
-        if(postalAddressList && postalAddressList.length > 0) {
-            for(const postalAddress of postalAddressList) {
-                postalAddressMap[postalAddress.postalContactMechId] = postalAddress;
-            }
-        };
-
+        this.clearPostalAddressMap();
+        this.addPostalAddresses(cInfo.postalAddressList);
         for(const key of UserAccount.CONFIG_KEYS) {
             this[key] = cInfo[key];
         }
+        this.token = data.moquiSessionToken;
+        this.apiKey = data.apiKey;
+        this.loggedIn = data.loggedIn ? true : false;
     }
 
     register() {
@@ -262,69 +309,69 @@ class Cart extends BOClient {
         this.addCallback(()=>{self.reset(); return Promise.resolve(true); }, "loggedIn", false, "resetCart");
         this.addCallback(()=>{return self.load().then(() => true); }, "loggedIn", true, "loadCart");
     }
-    get isLoggedIn() {
-        return this.store.isLoggedIn;
+    get loginForm() {
+        return getLoginForm(null, null);
     }
     get isCartLoaded() {
         return this.store.isCartLoaded;
     }
     set isCartLoaded(isCartLoaded) {
-        this.setConfig("isCartLoaded", isCartLoaded ? true : false);
+        this.storeValue("isCartLoaded", isCartLoaded ? true : false);
     }
     get paymentsTotal() {
         return this.store.paymentsTotal;
     }
     set paymentsTotal(total) {
-        this.setConfig("paymentsTotal", total, 0);
+        this.storeValue("paymentsTotal", total, 0);
     }
     get totalUnpaid() {
         return this.store.totalUnpaid;
     }
     set totalUnpaid(total) {
-        this.setConfig("totalUnpaid", total, 0);
+        this.storeValue("totalUnpaid", total, 0);
     }
     get productsQuantity() {
         return this.store.productsQuantity;
     }
     set productsQuantity(quantity) {
-        this.setConfig("productsQuantity", quantity, 0);
+        this.storeValue("productsQuantity", quantity, 0);
     }
     
     get orderPromoCodeDetailList() {
         return this.store.orderPromoCodeDetailList;
     }
     set orderPromoCodeDetailList(list) {
-        this.setConfig("orderPromoCodeDetailList", list, []);
+        this.storeValue("orderPromoCodeDetailList", list, []);
     }
     get paymentInfoList() {
         return this.store.paymentInfoList;
     }
     set paymentInfoList(list) {
-        this.setConfig("paymentInfoList", list, []);
+        this.storeValue("paymentInfoList", list, []);
     }
     get orderItemList() {
         return this.store.orderItemList;
     }
     set orderItemList(list) {
-        this.setConfig("orderItemList", list, []);
+        this.storeValue("orderItemList", list, []);
     }
     get orderItemWithChildrenSet() {
         return this.store.orderItemWithChildrenSet;
     }
     set orderItemWithChildrenSet(list) {
-        this.setConfig("orderItemWithChildrenSet", list, []);
+        this.storeValue("orderItemWithChildrenSet", list, []);
     }
     get orderHeader() {
         return this.store.orderHeader;
     }
     set orderHeader(orderHeader) {
-        this.setConfig("orderHeader", orderHeader, {});
+        this.storeValue("orderHeader", orderHeader, {});
     }
     get orderPart() {
         return this.store.orderPart;
     }
     set orderPart(orderPart) {
-        this.setConfig("orderPart", orderPart, {});
+        this.storeValue("orderPart", orderPart, {});
     }
 
     assign(data) {
@@ -362,17 +409,17 @@ class Cart extends BOClient {
                     return self;
                 });
     }
-    addProduct(product, quantity = 1) {
+    addProduct(orderInfo) {
         const self = this;
         if(!this.loggedIn) {
-            this.addCallback(()=>{return self.addProduct(product, quantity).then(() => false);}, "loggedIn", true)
+            this.addCallback(()=>{return self.addProduct(orderInfo).then(() => false);}, "loggedIn", true)
             if(this.loginForm) {
                 this.loginForm.open();
             }
             return self;
         }
 
-        return this.post("/cart/add", product)
+        return this.post("/cart/add", orderInfo)
             .then(function (data) {
                 self.reset();
                 self.assign(data);

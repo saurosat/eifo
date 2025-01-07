@@ -181,7 +181,7 @@
     </nav>
 
     <!--Modal Dialogs LOGIN-->
-    <div x-data="userLogin($el, '/components/login')" @open-login.window="open()" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
+    <div x-data="getLoginForm($el, '/components/login')" @open-login.window="open()" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
     style="background-color: rgba(0,0,0,.5);" x-show="isOpen"></div>
     <div x-data="cartDialog($el, 'paypal-button-container')" @open-cart.window="open()" class="absolute top-0 left-0 w-full h-full flex font-sans z-10"
         style="background-color: rgba(0,0,0,.5);" x-show="isOpen">

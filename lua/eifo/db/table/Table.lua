@@ -75,7 +75,7 @@ function _table:new(tableInfo)
         tbl._name = assert(tableInfo.name, "table name is missing in table schema")
         local ok, recordClass = pcall(require, "eifo.db.record."..tbl._name)
         tbl._record = ok and recordClass or recordBaseClass
-        ngx.log(ngx.INFO, "Table "..tbl._name..", record class: "..tbl._record.className)
+        -- ngx.log(ngx.INFO, "Table "..tbl._name..", record class: "..tbl._record.className)
     end
     if not self._alias then
         tbl._alias = tableInfo.alias or tbl._name

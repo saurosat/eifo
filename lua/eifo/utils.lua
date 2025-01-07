@@ -361,7 +361,18 @@ local getPathParam = function(uri, api)
     end
     return splitStr(paramStr, "/")
 end
-local utils = newTable(0, 27)
+
+local read_file = function(path)
+    local file, err = io.open(path, "rb")
+    if not file then return nil, err end
+    local content
+    content, err = file:read "*a"
+    file:close()
+    return content, err
+end
+
+local utils = newTable(0, 35)
+utils.read_file = read_file
 utils.sourceCode = sourceCode
 utils.splitStr = splitStr
 utils.getPropertyValue = getPropertyValue
