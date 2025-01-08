@@ -153,6 +153,7 @@ rwmt.hdel = function(self, key, fields, autocommit)
     local version
     if not fields then
         oldVals = curvals
+        curvals = nil
         deleteAll = true
     else
         if #fields == 0 then
