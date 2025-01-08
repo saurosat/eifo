@@ -168,7 +168,7 @@ function _record:load(conn)
     local eData = conn:hgetall(self.key)
     if not eData or utils.isTableEmpty(eData) then
         local err = "Entity key '"..self.key.."' not found in "..self._table._name
-        ngx.log(ngx.DEBUG, err)
+        --ngx.log(ngx.DEBUG, err)
         return nil, err
     end
 
@@ -219,7 +219,7 @@ function _record:deleteFields(conn, fields, nocommit)
 end
 function _record:save(conn, nocommit)
     --assert(not self._table.evs, "Trying to update a read-only entity: "..self._table._name)
-    ngx.log(ngx.DEBUG, "self['key'] = "..utils.toString(self["key"]))
+    --ngx.log(ngx.DEBUG, "self['key'] = "..utils.toString(self["key"]))
     local oldVals, err, newVals = conn:hset(self["key"], self)
     if err then 
         conn:rollback()
@@ -236,16 +236,17 @@ function _record:save(conn, nocommit)
     if errMsg then
         ngx.log(ngx.ERR, errMsg)
     end
-    if nocommit and not ok then
+    if not ok then
+        ngx.log(ngx.DEBUG, "Error: "..(errMsg or "Unknown reason"))
+        if not nocommit then
+            ngx.log(ngx.DEBUG, "Rollback key "..self["key"])
+            conn:rollback()            
+        end
         return nil, nil, errMsg
-    else
-        if ok then
-            ngx.log(ngx.DEBUG, "Commit key "..self["key"])
-            conn:commit()
-        else
-            ngx.log(ngx.DEBUG, "Error: "..errMsg.."Rollback key "..self["key"])
-            conn:rollback()
-        end    
+    end
+    if not nocommit then
+        ngx.log(ngx.DEBUG, "Commit key "..self["key"])
+        conn:commit()            
     end
     if oldVals and next(oldVals) then
         self.isUpdated = true
@@ -257,16 +258,14 @@ end
 function _record:updateParents(newVals, oldVals, conn)
     local leftCols = self._table._leftCols
     for colName, _ in pairs(leftCols) do
-        local isNew = newVals and newVals[colName]
-        local newVal = (oldVals and oldVals[colName] and self[colName]) or isNew
+        local newVal = newVals and newVals[colName]
         if newVal then
             local num, err = conn:sadd(self:getLeftRelKey(colName, newVal), self.key)
-            if num == 0 then
+            if not num then
                 return false, err
             end
-        end
-        if isNew then
-            local group = self._table.groupBy[colName][newVal]
+            local groupBy = self._table.groupBy[colName]
+            local group = groupBy and groupBy[newVal]
             if group then
                 group:add(self.key)
             end
@@ -321,7 +320,7 @@ local function notifyAll(records, observers, oldVals, newVals)
     local leftTables = record._table._leftTables
     local leftCols = record._table._leftCols
     for colName, tblInfo in pairs(leftCols) do
-        if string.sub(colName, -2) == "Id" then
+        if record[colName] and string.sub(colName, -2) == "Id" then
             local lRecordName =  string.sub(colName, 1, -3)
             local lRecord = record[lRecordName]
             if lRecord then

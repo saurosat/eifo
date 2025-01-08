@@ -174,7 +174,7 @@ function _table:loadByKey(recordKey, nowEpoch)
     record, err = record:load(conn)
     if not record then
         local errMsg = "Record not found: "..recordKey..(err and ": "..err or "")
-        ngx.log(ngx.DEBUG, errMsg)
+        --ngx.log(ngx.DEBUG, errMsg)
         return nil, err
     end
 

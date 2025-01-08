@@ -7,10 +7,15 @@ local utils = eifo.utils
 
 local rwmt = utils.newTable(0, 18)
 rwmt.connect = function(self)
-    return self.connection:connect(self._host, self._port)
+    return self.connection:connect(self._host, self._port, {pool_size = self._poolsize})
 end
 rwmt.disconnect = function(self)
-    return self.connection:set_keepalive(self._timeout, self._poolsize)
+    local ok, err = self.connection:set_keepalive(self._timeout, self._poolsize)
+    if not ok then
+        ngx.log(ngx.ERR, "set keep alive error: ", err)
+        return self.connection:close()
+    end
+    return ok, err
 end
 rwmt.rollback = function(self)
     local _rollback = self._rollback
@@ -210,7 +215,8 @@ rwmt.sadd = function(self, key, item, autocommit)
     end
     local num, err = self.connection:sadd(key, item)
     if not num then
-        ngx.log(ngx.ERR, "SADD Key="..(key or "NIL")..", item="..(item or "NIL").." "..(err or ""))
+        err = "SADD Key="..(key or "NIL")..", item="..(item or "NIL").." "..(err or "")
+        ngx.log(ngx.ERR, err)
         return 0, err
     end
     if not autocommit and  num > 0 then
@@ -248,8 +254,8 @@ local redisAgent = require "resty.redis"
 local connFactory = {
     host = "127.0.0.1",
     port = "6379",
-    poolsize = 100,
-    timeout = 10000,
+    poolsize = 1000,
+    timeout = 1000,
     redis = function(host, port, poolsize, timeout)
         local ngx = ngx
         host = host or eifo.db.host or ngx.var.dbhost

@@ -4,7 +4,6 @@
 --- DateTime: 9/2/23 12:06 PM
 ---
 local utils = eifo.utils
-local lockKey = "notifyChanges"
     -- 1. Read Request data:
 local readReqData = require "resty.reqargs"
 local getData, postData, fileData = readReqData()
@@ -20,14 +19,17 @@ if not entityName then
     utils.responseError(ngx.HTTP_BAD_REQUEST, "Entity Name is expected with key 'entityName'")
     return
 end
---ngx.say("Entity Name: "..entityName)
---ngx.log(ngx.DEBUG, utils.toJson(eifo.db.table))
 
 local onAction = utils.popKey(reqData, "on")
 local viewableCat = utils.popKey(reqData, "viewable")
 local columnPrefix = utils.popKey(reqData, "columnPrefix")
 local tobeDeleted = utils.popKey(reqData, "delete")
 local storeId = utils.popKey(reqData, "storeId")
+
+--ngx.log(ngx.DEBUG, utils.toJson(eifo.db.table))
+ngx.status = ngx.HTTP_OK
+ngx.say("Thank you! Store: "..storeId.." have got the notification of "..entityName.." "..onAction )
+ngx.eof()
 
 local connFactory = eifo.db.conn
 local conn, errMsg = connFactory.redis()
@@ -38,43 +40,36 @@ end
 local ok, error = conn:connect()
 if not ok then
     ngx.log(ngx.ERR, "Cannot get connection: "..(error or "unknown error"))
-    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
-    ngx.print("Cannot connect to local DB: "..(error or "Unknown error."))
-    ngx.eof() -- release http connection
+    conn:disconnect()
     return
 end
 local tbl = eifo.db.table[entityName]:new({conn = conn})
 if not tbl then
-    utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Entity '" .. entityName .."' has no definition")
+    ngx.log(ngx.CRIT, "Entity '" .. entityName .."' has no definition")
+    conn:disconnect()
     return
 end
-ngx.log(ngx.DEBUG, "Table "..tbl._name..", entityName="..entityName)
 local record, err = tbl:newRecord(reqData)
 
 if not record then
     ngx.log(ngx.INFO, "Cannot initiate entity value: "..(err or ""))
-    utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, "Cannot initiate entity value: "..(err or ""))
+    conn:disconnect()
     return
 end
-ngx.log(ngx.DEBUG, "record is "..(record and utils.toJson(record) or "NIL"))
+ngx.log(ngx.DEBUG, "Table: "..tbl._name..", entityName: "..entityName..", record key: "..record.key..", record: "..(record and utils.toJson(record) or "NIL"))
 
+local lockKey = "notifyChanges"
 conn:incr(lockKey)
 local currentRecord = tbl:load({key = record.key}, conn)
-local oldVals, newVals, err = record:persist(conn, tobeDeleted)
-if err then
-    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
-    ngx.print("Failed to updated: "..err)
-    ngx.eof() -- release http connection
-    ngx.log(ngx.ERR, err)
-else
-    ngx.status = ngx.HTTP_OK
-    ngx.print("OK!")
-    ngx.eof() -- release http connection
+local oldVals, newVals, persistErr = record:persist(conn, tobeDeleted)
+if not persistErr then
     if currentRecord then
         currentRecord:_notify(oldVals, newVals)
     else
         record:_notify(oldVals, newVals)
     end
+else
+    ngx.log(ngx.ERR, "Failed to updated: "..persistErr)
 end
 local num = conn:decr(lockKey)
 conn:disconnect()
@@ -94,20 +89,8 @@ if ipStr and type(ipStr) == 'string' then
 end
 ngx.shared.lock:flush_all()
 
-ngx.log(ngx.DEBUG, utils.toString(reqData, ": ", "\n")..": "..((ok and "Updated successfully") or error or "Updated failed"))
--- if not ok then
---     utils.responseError(ngx.HTTP_INTERNAL_SERVER_ERROR, error)
--- else
---     ngx.status = ngx.HTTP_OK
---     ngx.say("OK!")
---     ngx.eof()
--- end
+ngx.log(ngx.DEBUG, "Entity: "..entityName..", record key: "..record.key..((ok and "Updated successfully") or error or "Updated failed"))
 
-
-
---if num == 0 and ngx.var.autoRegen then
---    ngx.location.capture("/generateStaticResource")
---end
 
 --- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_001&productName=Demo%20One&description=For%Demo1
 --- HASH type: "p:DEMO_001" --> {"productName": "Demo One", "description":"For%Demo1"}
