@@ -1,6 +1,11 @@
 {%
     local products = cat:getProducts("e.PctCatalog", true)
     local num = #products
+    for i = num, 1, -1 do 
+        if not next(products[i].images) then
+            num = num - 1
+        end
+    end
     if num > 0 then 
         local colspans = {"", "", "", ""}
         local rowspans = {"", "", "", ""}
