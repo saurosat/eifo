@@ -110,7 +110,12 @@
                 if cat.productCategoryTypeEnumId == 'e.PctCatalog' then
                     local catMems = cat.catMems
                     for iP = 1, #catMems, 1 do 
-                        products:add(catMems[iP].product)
+                        local p = catMems[iP].product
+                        if p then
+                            products:add(p)
+                        else
+                            ngx.log(ngx.ERR, (catMems[iP].productId or "catMem product").." is not found")
+                        end
                     end
         %}
                     {(/category/productCard, {cat = cat})}
