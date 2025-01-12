@@ -37,14 +37,14 @@ local _view = setmetatable({},
     }
 )
 
-function _view:new(viewInfo)
-    local view = setmetatable(viewInfo or {}, self)
-    self.__index = self
+local function newView(viewInfo, fullName)
+    ngx.log(ngx.DEBUG, "ViewInfo: "..utils.toJson(viewInfo))
+    local view = setmetatable(viewInfo or {}, {__index = _view})
+    view.name = fullName
 
     local tableDef = viewInfo.tableDef 
-                    or assert(viewInfo.tableName and eifo.db.table[viewInfo.tableName])
-    ngx.log(ngx.DEBUG, "ViewInfo: "..utils.toJson(viewInfo))
-    view.table = tableDef:new({
+                    or (viewInfo.tableName and eifo.db.table[viewInfo.tableName])
+    view.table = tableDef and tableDef:new({
         toJsonColumns = viewInfo.toJsonColumns,
     })
     local layoutType = type(view.layout)
@@ -54,15 +54,31 @@ function _view:new(viewInfo)
     end
     return view
 end
-_view.loadView = function(self, fullName, templatePath)
+
+-- function _view:new(viewInfo)
+--     local view = setmetatable(viewInfo or {}, self)
+--     self.__index = self
+
+--     local tableDef = viewInfo.tableDef 
+--                     or assert(viewInfo.tableName and eifo.db.table[viewInfo.tableName])
+--     ngx.log(ngx.DEBUG, "ViewInfo: "..utils.toJson(viewInfo))
+--     view.table = tableDef and tableDef:new({
+--         toJsonColumns = viewInfo.toJsonColumns,
+--     })
+--     local layoutType = type(view.layout)
+--     if layoutType == "string" then
+--         view.layoutUri = view.layout
+--         view.layout = nil
+--     end
+--     return view
+-- end
+_view.loadView = function(fullName, templatePath)
     local viewInfo = require(fullName)
     if not viewInfo or type(viewInfo) ~= "table" then
         return nil
     end
 
-    local view = self:new(viewInfo)
-    view.name = fullName
-    view.contentType = "application/json; charset=utf-8"
+    local view = newView(viewInfo, fullName)
     if not templatePath then
         return view
     end
@@ -74,19 +90,10 @@ _view.loadView = function(self, fullName, templatePath)
         return view
     end
     view.template = template.compile(content, "no-cache", true)
-    view.contentType = "text/html; charset=utf-8"
     return view
 end
 
-_view.getConn = function (...)
-    local conn, err = eifo.db.conn.redis()
-    if not conn then
-        return nil, err
-    end
-    conn:connect()
-    return conn
-end
-_view.getKey = function (self, params)
+function _view:getKey(params)
     if self.key then
         return self.key
     end
@@ -95,38 +102,44 @@ _view.getKey = function (self, params)
     end
     return params.key or (#params == 1 and params[1]) or self.table:generateKey(params)
 end
-_view.render = function(self, params, noLayout)
+function _view:getRecord(conn, params, noLayout)
+    if self.record then
+        return self.record
+    end
     local key = self:getKey(params)
     if not key then
-        ngx.log(ngx.INFO, (self.name or "root")..": No search params")
-        return nil, ngx.HTTP_BAD_REQUEST
+        return nil, nil, (self.name or "root")..": Cannot generate key. No search params"
     end
 
-    local conn = self:getConn()
-    if not conn then
-        ngx.log(ngx.ERR, (self.name or "root")..": Cannot get connection")
-        return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
-    end
-    conn:connect()
     local model = self.table:new({conn = conn})
     ngx.log(ngx.DEBUG, (self.name or "root")..": Loading key "..key)
     local record, err = model:loadByKey(key)
+    return record, key, err
+end
+function _view:render(params, noLayout)
+    local conn, err = utils.getDbConnection()
+    if not conn then
+        ngx.log(ngx.ERR, (self.name or "root")..": Cannot get connection, "..(err or ""))
+        return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
+    end
+    conn:connect()
+    local record, key, loadingErr = self:getRecord(conn, params, noLayout)
     if not record then
-        ngx.log(ngx.INFO, err)
+        ngx.log(ngx.INFO, "ERR_NOT_FOUND: "..loadingErr)
         conn:disconnect()
         return nil, ngx.HTTP_NOT_FOUND
     end
 
     if not self.template then
-        return self.toJson and self:toJson(record) or record:toJson(), ngx.HTTP_OK, "application/json"
+        conn:disconnect()
+        return self.toJson and self:toJson(record) or record:toJson(), ngx.HTTP_OK
     end
     local sHtml = self.template({record = record, main = "{* main *}"}) --> main for layout pre-compile
-    if noLayout or not (self.layoutUri or self.layout) then
-        return sHtml, ngx.HTTP_OK, "text/html"
-    end
-    self.layout = self.layout or (self.layoutUri and template.compile(self.layoutUri))
-    if self.layout then
-        sHtml = self.layout({main = sHtml, record = record})
+    if not noLayout then
+        self.layout =  self.layout or (self.layoutUri and template.compile(self.layoutUri))
+        if self.layout then
+            sHtml = self.layout({main = sHtml, record = record})
+        end
     end
 
     conn:disconnect()

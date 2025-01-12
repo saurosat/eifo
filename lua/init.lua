@@ -13,6 +13,17 @@ end})
 eifo.basePath = ngx.config.prefix()
 eifo._lazyObjs = {}
 eifo._lazyObjs["store"] = require "eifo.store"
+eifo.contentTypes = {
+    json = "application/json; charset=utf-8",
+    xml = "application/xml; charset=utf-8",
+    html = "text/html; charset=utf-8",
+    js = "text/javascript; charset=utf-8",
+    css = "text/css; charset=utf-8"
+}
+eifo.pathPrefixes = {
+    js = "js",
+    css = "css"
+}
 
 require "eifo.db.conn"
 require "eifo.db.table.init"
@@ -22,13 +33,13 @@ local Route = require("eifo.route")
 
 local viewPath = eifo.basePath.."/lua/view"
 local startPos = string.len(viewPath) + 1
-local tmplFiles = {}
+local templatePaths = {}
 
 ngx.log(ngx.INFO, "Base path: "..eifo.basePath)
 
 eifo.route = Route:new{pos=0, path=eifo.basePath.."/home"}
 
-local cmd = "find "..viewPath.." -name '*.view.html'"
+local cmd = "find "..viewPath.." -name '*.view.*'"
 ngx.log(ngx.INFO, "Searching views: "..cmd)
 local pfile, err = io.popen(cmd, "r")
 if not pfile then
@@ -37,8 +48,9 @@ if not pfile then
 end
 local filePath = pfile:read('*l')
 while filePath do
-    local uri = string.sub(filePath, startPos, -11) --remove ".view.html"
-    tmplFiles[uri] = filePath
+    local fr, to = string.find(filePath, "%.view%.%a+$")
+    local uri = string.sub(filePath, startPos, fr - 1) --remove ".view.*"
+    templatePaths[uri] = filePath
     filePath = pfile:read('*l')
 end
 pfile:close()
@@ -55,10 +67,15 @@ while filePath do
     local uri = string.sub(filePath, startPos, -5) --remove .lua
     local paths = eifo.utils.splitStr(string.sub(uri, 1), "/")
     local viewName = "view."..table.concat(paths, ".")
-    local view = View:loadView(viewName, tmplFiles[uri])
-    tmplFiles[uri] = nil
+    local templatePath = templatePaths[uri]
+    local view = View.loadView(viewName, templatePath)
+    templatePaths[uri] = nil
     if view then
-        eifo.route:addView(paths, view)
+        local fileExt
+        if templatePath then
+            _, _ , fileExt = string.find(templatePath, "%.view%.(%a+)$")
+        end
+        eifo.route:addView(paths, view, fileExt)
     else
         ngx.log(ngx.WARN, "Ignored view "..table.concat(paths, "/")..": empty or invalid view configuration")
     end
@@ -66,7 +83,7 @@ while filePath do
 end
 pfile:close()
 
-for uri, filePath in pairs(tmplFiles) do
+for uri, tmplFile in pairs(templatePaths) do
     local paths = eifo.utils.splitStr(string.sub(uri, 1), "/")
-    eifo.route:addView(paths, {filePath = filePath})
+    eifo.route:addView(paths, {filePath = tmplFile})
 end

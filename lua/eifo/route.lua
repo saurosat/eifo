@@ -31,9 +31,17 @@ function Route:render(params, noLayout)
 end
 
 function Route:getRoute(uriStr)
+    local startPos, _ , fileExt = string.find(uriStr, "%.(%a+)$")
+    if startPos then
+        uriStr = string.sub(uriStr, 1, startPos - 1)
+    end
     local pathParams = eifo.utils.getPathParam(uriStr)
     if pathParams[1] == "api" then
         table.remove(pathParams, 1)
+    end
+    local pathPrefix = fileExt and eifo.pathPrefixes[fileExt]
+    if pathPrefix and pathParams[1] ~= pathPrefix  then
+        table.insert(pathParams, 1, pathPrefix)
     end
 
     local node = self
@@ -59,13 +67,22 @@ function Route:getRoute(uriStr)
     return node, params, noLayout
 end
 
-function Route:addView(paths, view)
+function Route:addView(paths, view, fileExt)
     local route = self
+    local pathPrefix = fileExt and eifo.pathPrefixes[fileExt]
+    if pathPrefix and paths[1] ~= pathPrefix then
+        table.insert(paths, 1, pathPrefix)
+    end
+    ngx.log(ngx.DEBUG, utils.toJson(paths), pathPrefix or " no prefix")
+
     local numDirs = #paths - 1
     for i = 1, numDirs, 1 do
         route = route:addRoute(paths[i], {outputFile = view.outputFile})
     end
     route = route:addRoute(paths[#paths], view)
+    if fileExt then
+        route.fileExt = fileExt
+    end
 end
 
 function Route:addRoute(subName, subView)
@@ -94,10 +111,10 @@ function Route:addRoute(subName, subView)
         route = Route:new({name = subName, path = subPath, pos = self.pos + 1})
         self[routeKey] = route
     end
-    if subView then --> real view, not emptyView
-        if subView.table then
+    if subView then
+        if subView.name then --> real view, not emptyView
             route.view = subView
-            if subView.outputFile then
+            if subView.table and subView.outputFile then 
                 route._observerId = subView.name
                 subView.table:_attach(route)
             end
@@ -107,7 +124,18 @@ function Route:addRoute(subName, subView)
     end
     return route
 end
-
+function Route:getFileExt()
+    if not self.fileExt then
+        self.fileExt = (not self.template and "json") or "html"
+    end
+    return self.fileExt
+end
+function Route:getContentType()
+    if not self.contentType then
+        self.contentType = eifo.contentTypes[self:getFileExt()]
+    end
+    return self.contentType
+end
 function Route:getFilePath(params, noLayout)
     if self.filePath then
         return self.filePath
@@ -137,7 +165,7 @@ function Route:getFilePath(params, noLayout)
         params[num + 1] = params[num]
         params[num] = "no_layout"
     end
-    return self.path.."/"..table.concat(params, "/")..".html"
+    return self.path.."/"..table.concat(params, "/").."."..self:getFileExt()
 end
 function Route:loadFromFile(params, noLayout)
     local filePath = self:getFilePath(params, noLayout)

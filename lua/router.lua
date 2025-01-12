@@ -6,12 +6,13 @@
 local utils = eifo.utils
 ngx.log(ngx.INFO, "URI: ____"..ngx.var.request_uri.."_____")
 local route, params, noLayout = eifo.route:getRoute(ngx.var.request_uri)
-local content, status, contentType = route:render(params, noLayout)
+local content, status = route:render(params, noLayout)
 if status < 200 or status >= 400 then
     utils.responseError(status, "Error")
     return
 end
-ngx.header.content_type = contentType
+
+ngx.header.content_type = route:getContentType()
 ngx.send_headers()
 ngx.print(content)
 ngx.eof()

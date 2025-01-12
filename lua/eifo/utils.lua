@@ -416,7 +416,9 @@ end
 utils.lifo = lifo
 
 utils.responseError = responseError
-
+utils.getDbConnection = function ()
+    return eifo.db.conn.redis()
+end
 utils.cloneHashTbl = function(hTable, resultTable, refs)
     for key, value in pairs(hTable) do
         resultTable[key] = utils.clone(value, refs)
