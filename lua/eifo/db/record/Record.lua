@@ -146,9 +146,15 @@ function _record:toJson(columns)
     columns = columns or self._table.toJsonColumns
     if columns then
         for i = 1, #columns, 1 do
-            local colValJson = utils.toJson(utils.getPropertyValue(self, columns[i]), refs)
-            if colValJson then
-                json = json..'"'..columns[i]..'": '..colValJson..", "
+            local colName = columns[i]
+            local colFunc = self["_"..colName.."ToJson"]
+            if type(colFunc) ~= "function" then
+                local result = colFunc(self)
+                json = json..result..", "
+            else
+                local colVal = utils.getPropertyValue(self, colName)
+                local colValJson = utils.toJson(colVal, refs)
+                json = json..'"'..colName..'": '..colValJson..", "
             end
         end
     end

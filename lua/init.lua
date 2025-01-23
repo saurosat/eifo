@@ -30,6 +30,37 @@ require "eifo.db.table.init"
 local View = require("eifo.view")
 local Route = require("eifo.route")
 
+string._specialChars_ = {
+    ["\\"] = "\\\\",
+    ["\""] = "\\\"",
+    ["'"]  = "\\'",
+    ["\a"] = "\\a",
+    ["\b"] = "\\b",
+    ["\f"] = "\\f",
+    ["\n"] = "\\n",
+    ["\r"] = "\\r",
+    ["\t"] = "\\t",
+    ["\v"] = "\\v",
+}
+string.escape = function(s)
+
+    -- Replace known special characters
+    s = s:gsub(".", string._specialChars_)
+
+    -- Optionally, escape other non-printable characters
+    -- s = s:gsub("([^%z\32-\126])", function(c)
+    --     return string.format("\\x%02X", string.byte(c))
+    -- end)
+
+    return s
+end
+local function _encode_char(char)
+    return string.format('%%%0X', string.byte(char))
+end
+
+string.encode = function (s)
+    return (string.gsub(s, "[^%a%d%-_%.!~%*'%(%);/%?:@&=%+%$,#]", _encode_char))
+end
 
 local viewPath = eifo.basePath.."/lua/view"
 local startPos = string.len(viewPath) + 1
@@ -37,7 +68,7 @@ local templatePaths = {}
 
 ngx.log(ngx.INFO, "Base path: "..eifo.basePath)
 
-eifo.route = Route:new{pos=0, path=eifo.basePath.."/home"}
+eifo.route = Route:new{pos=0, basePath=eifo.basePath.."/home"}
 
 local cmd = "find "..viewPath.." -name '*.view.*'"
 ngx.log(ngx.INFO, "Searching views: "..cmd)

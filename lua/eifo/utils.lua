@@ -61,7 +61,7 @@ local function toJson(v, refs)
     if v == nil then return "null" end
     local vType = type(v)
     if vType ~= "table" then
-        return (vType == "string" and ('"'..v..'"'))
+        return (vType == "string" and ('\"'..v..'\"'))
                 or (vType == "boolean" and (v and "true" or "false"))
                 or (vType == "function" and sourceCode(v))
                 or _G.tostring(v)

@@ -19,12 +19,13 @@ function record:getParents()
             parents[parent.productCategoryTypeEnumId] = parent
         end
     end
-    self.setMetaValue("parents", parents)
+    self:setMetaValue("parents", parents)
     return parents
 end
 function record:getChildren()
     local children = self:getMetaValue("children", true) 
     if children then
+        ngx.log(ngx.DEBUG, self.key.."'s children: "..utils.toJson(children))
         return children
     end
     local tbl = self._table
@@ -32,8 +33,11 @@ function record:getChildren()
         ngx.log(ngx.ERR, self.className.." record "..utils.toJson(self).." has no associated table")
         return {}
     end
-    children = {}
+    children = utils.ArraySet:new()
     local rollups = self.childRollups or {}
+    if #rollups == 0 then
+        ngx.log(ngx.DEBUG, self.key.." childRollups is empty")
+    end
     for i = #rollups, 1, -1 do
         local rollup = rollups[i]
         local child = rollup.productCategory
@@ -41,21 +45,15 @@ function record:getChildren()
             rollups:remove(rollup)
             rollup._table:remove(rollup)
         else
-            local childCatType = child.productCategoryTypeEnumId
-            if childCatType then
-                if not children[childCatType] then
-                    children[childCatType] = utils.ArraySet:new()
-                end
-                children[childCatType]:add(child)
-            end
+            children:add(child)
         end
     end
-    self.setMetaValue("children", children)
+    ngx.log(ngx.DEBUG, self.key.."'s children loaded: "..utils.toJson(children))
+    self:setMetaValue("children", children)
     return children
 end
 function record:getProducts (catType)
     --ngx.log(ngx.DEBUG, "catType = "..(catType or "nil"))
-    catType = catType or nil
     local products = {}
     local catMems = self.catMems
     if catMems then
@@ -67,15 +65,13 @@ function record:getProducts (catType)
     end
     local directOnly = not catType
     if not directOnly then
-        local children = self.children
-        for childCatType, childCats in pairs(children) do
-            if catType == nil or catType == childCatType then
-                for i = 1, #childCats, 1 do 
-                    local childCat = childCats[i]
-                    local childCatPrds = childCat:getProducts(catType)
-                    for j = 1, #childCatPrds, 1 do 
-                        products[#products + 1] = childCatPrds[j]
-                    end
+        local childCats = self.children
+        for i = 1, #childCats, 1 do 
+            local childCat = childCats[i]
+            if not catType or childCat.productCategoryTypeEnumId == catType then
+                local childCatPrds = childCat:getProducts(catType)
+                for j = 1, #childCatPrds, 1 do 
+                    products[#products + 1] = childCatPrds[j]
                 end
             end
         end
@@ -83,27 +79,65 @@ function record:getProducts (catType)
     ngx.log(ngx.DEBUG, "Numbers of products: " ..#products.."cat:getProducts, catMems: "..(catMems and tostring(#catMems) or "nil"))
     return products
 end
-function record:convertTreeToString(pattern, propNames, categoryType)
-    if categoryType and self.productCategoryTypeEnumId ~= categoryType then
-        return ''
-    end
-    local values = utils.newArray(#propNames)
-    for i = 1, #propNames, 1 do
-        values[i] = self[propNames[i]]
-    end
-    ngx.log(ngx.DEBUG, "Convert tree to string"..utils.toJson(values))
-    local str = string.format(pattern, table.unpack(values))
-    local childs = self.children
-    if not childs then
-       return str 
-    end
-    for i = 1, #childs, 1 do
-        if childs[i] then
-            local subCat = self._table:keys(childs[i].productCategoryId)
-            str = str..subCat:convertTreeToString(pattern, propNames, categoryType)
+function record:getTreeDisplayStrs(catArray, subCatFilter, tab, space, bullet, hJoint, vJoint)
+    catArray = catArray or {}
+    tab = tab or "\xc2\xbb"
+    space = space or "\xc2\xa0"
+    bullet = bullet or "+" --"├"
+    hJoint = hJoint or "-" -- "─"
+    vJoint = vJoint or "-" --"│"
+    local tabLen = tab:len()
+    local needReplaceByVJoint = (vJoint ~= tab)
+
+    local function buildTree(cat, gen, lastSiblingRowIdx)
+        local treeNodeName = ""
+        if gen > 0 then
+            if gen > 1 then
+                local sTab = string.rep(tab, gen - 1)
+                treeNodeName = treeNodeName..sTab
+            end
+            if needReplaceByVJoint then
+                local vJointPos = treeNodeName:len() + 1
+                for i = #catArray, lastSiblingRowIdx + 1, -1 do
+                    local prevCat = catArray[i]
+                    local s = prevCat:getMetaValue("treeNodeName")
+                    -- replacing space by vJoint:
+                    s = string.sub(s, 1, vJointPos -1)..vJoint..string.sub(s, vJointPos + tabLen + 1, -1)
+                    prevCat:setMetaValue("treeNodeName", s)
+                end
+            end
+            treeNodeName = treeNodeName..bullet..space
+        end
+        treeNodeName = treeNodeName..cat.categoryName
+        cat:setMetaValue("treeNodeName", treeNodeName)
+        local thisRowIdx = #catArray + 1
+        catArray[thisRowIdx] = cat
+    
+        local childs = cat:getChildren()
+        if not childs then
+           return
+        end
+        local sibblingRowIdx = thisRowIdx
+        for i = 1, #childs, 1 do
+            local subCat = childs[i]
+            local pass = true
+            if subCatFilter then
+                for key, value in pairs(subCatFilter) do
+                    if subCat[key] ~= value then
+                        pass = false
+                        break
+                    end
+                end
+            end
+            if pass then
+                buildTree(subCat, gen + 1, sibblingRowIdx)
+                sibblingRowIdx = sibblingRowIdx + 1
+            end
         end
     end
-    return str;
+    buildTree(self, 0, #catArray)
+
 end
+
 
 return record

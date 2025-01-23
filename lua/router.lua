@@ -5,15 +5,23 @@
 ---
 local utils = eifo.utils
 ngx.log(ngx.INFO, "URI: ____"..ngx.var.request_uri.."_____")
-local route, params, noLayout = eifo.route:getRoute(ngx.var.request_uri)
-local content, status = route:render(params, noLayout)
-if status < 200 or status >= 400 then
-    utils.responseError(status, "Error")
+local route, context = eifo.route:getRoute(ngx.var.request_uri)
+local content, err, status
+local view = route.view
+if not view then
+    content, err = route:loadFromFile(context)
+    status = content and ngx.HTTP_OK or ngx.HTTP_NOT_FOUND
+else
+    content, status = view:render(context)
+end
+if not content then
+    utils.responseError(status, "Error") --> TODO: localize messages
     return
 end
 
 ngx.header.content_type = route:getContentType()
+ngx.status = status
 ngx.send_headers()
 ngx.print(content)
 ngx.eof()
-route:saveToFile(content, params, noLayout)
+route:saveToFile(content, context)

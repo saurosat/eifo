@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Gleecy Shopping">
@@ -16,36 +17,11 @@
         <!-- To be replaced with your own stylesheet -->
     <!-- <link rel="stylesheet" type="text/css" href="https://www.paypalobjects.com/webstatic/en_US/developer/docs/css/cardfields.css"/> -->
 
-{%
-    local utils = eifo.utils
-    local categories = record.categories
-    local catJson = utils.toJson(categories)
-    local topCats = utils.ArraySet:new()
-    for i = 1, #categories, 1 do 
-        if categories[i].productCategoryTypeEnumId == 'e.PctCatalog' and not next(categories[i].parents) then 
-            topCats:add(categories[i])
-        end 
-    end 
-
-    local store = eifo.store
-    local token = store:getSessionToken()
-    local storeId = store.productStoreId
-    local currencyUomId = store.defaultCurrencyUomId or "undefined"
- %}
- <script>
-    const categories = {* catJson *};
-    const sessionToken = "{* token *}";
-    const storeId = "{* storeId *}";
-    const currencyUomId = "{* currencyUomId *}"
-
-    // Render the button component
-    
-
-</script>
+    <script src="/utils.js"></script>
+    <script src="/masterData.js"></script>
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 <script src="https://www.paypal.com/sdk/js?components=buttons&intent=authorize&client-id=AcdrYvOADBR9Bxhr7BtOIRDwwfhEOLdMHvvt89lTqxGdx_n6t9r5HdU6O4jn4qv1aSX0azdbw6TJA9wO"></script>
 <!-- <script src="/ApiServices.min.js"></script> -->
-<script src="/utils.js"></script>
 <script src="/UIComponents.js" defer></script>
 <!-- <script src="https://unpkg.com/alpinejs" defer></script> -->
 <script src="https://cdn.jsdelivr.net/npm/@alpinejs/persist@3.13.8/dist/cdn.min.js" defer></script>
@@ -100,9 +76,9 @@
                     class="rounded-l-lg border-none border-r-2 shadow-md h-full bg-gray-300 max-w-40 sm:max-w-80 lg:max-w-md"
                     style="width: 50px;">
                     <option value="cat1" selected>All</option>
-{%  for k = 1, #topCats, 1 do %}
-                    {* topCats[k]:convertTreeToString("<option value='%s' selected>%s</option>", {"key", "categoryName"}, "e.PctCatalog") *}
-{%  end %}
+                    <template x-for="cat in catTreeArray">
+                        <option :value="cat.key" x-text="cat.treeNodeName"></option>
+                    </template>
                 </select>
             </div>
             <div class="border-none flex flex-row flex-nowrap w-full relative rounded-r-lg">

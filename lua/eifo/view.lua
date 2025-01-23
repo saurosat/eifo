@@ -7,30 +7,70 @@
 local utils = eifo.utils
 local lock = require "eifo.lock"
 local template = require("resty.template")
-template.load = function (view, plain)
-    if plain == true then return view end
-    local route, params, noLayout = eifo.route:getRoute(view)
-    local content, filePath = route:loadFromFile(params, noLayout)
-    if not content then
-        local status
-        content, status = route:render(params, noLayout)
-        if not content or status < 200 or status >= 400 then
-            ngx.log(ngx.ERR, "Cannot render layout "..view)
-            return view
-        end
-        route:saveToFile(content, params, noLayout, filePath)
+template.load = function (viewSrc, plain)
+    if plain == true then return viewSrc end
+    local route, content, context, err
+    route, context = eifo.route:getRoute(viewSrc, context) --> always not nil
+    content, err = route:loadFromFile(context)
+    assert(not err, err)
+    if content then
+        return content
     end
+    -- if not content then: 
+    local view = route.view
+    if not view then
+        ngx.log(ngx.ERR, "route view is not found: "..route.path.."/"..(route.name or "")..", viewSrc: "..viewSrc)
+        return viewSrc
+    end
+
+    local status
+    content, status = view:render(context)
+    if not content or status < 200 or status >= 400 then
+        ngx.log(ngx.ERR, "Cannot render view "..viewSrc)
+        return viewSrc
+    end
+    -- not neccessary to save file at this time?: route:saveToFile(content, context)
+
     return content
 end
+
+-- template.process = function (viewSrc, context, cache_key, plain)
+--     assert(viewSrc, "view was not provided for template.process(view, context, cache_key, plain)")
+--     if plain == true then
+--         return template.compile(viewSrc, cache_key, plain)(context)
+--     end
+    
+--     local route, content, err
+--     route, context = eifo.route:getRoute(viewSrc, context) --> always not nil
+--     content, err = route:loadFromFile(context)
+--     assert(not err, err)
+--     if content then
+--         return content
+--     end
+--     -- if not content then: 
+--     local view = route.view
+--     if not view then
+--         ngx.log(ngx.ERR, "route view is not found: "..route.path.."/"..(route.name or "")..", viewSrc: "..viewSrc)
+--         return viewSrc
+--     end
+
+--     local status
+--     content, status = view:render(context)
+--     if not content or status < 200 or status >= 400 then
+--         ngx.log(ngx.ERR, "Cannot render view "..viewSrc)
+--         return viewSrc
+--     end
+--     -- not neccessary to save file at this time?: route:saveToFile(content, context)
+
+--     return content
+-- end
+
 local ngx = ngx
 
 local _view = setmetatable({}, 
     {
-        __index = {
-            _update = function ()
-                ngx.log(ngx.WARN, "_update() is not implemented")
-            end
-        },
+        -- __index = function(self, key)
+        -- end,
         __eq = function (v1, v2)
             return v1 and v2 and v1.name == v2.name
         end
@@ -52,26 +92,11 @@ local function newView(viewInfo, fullName)
         view.layoutUri = view.layout
         view.layout = nil
     end
+    view.requireKey = not view.key and not view.record
+    view.cacheTemplate = not view.outputFile or view.requireKey
     return view
 end
 
--- function _view:new(viewInfo)
---     local view = setmetatable(viewInfo or {}, self)
---     self.__index = self
-
---     local tableDef = viewInfo.tableDef 
---                     or assert(viewInfo.tableName and eifo.db.table[viewInfo.tableName])
---     ngx.log(ngx.DEBUG, "ViewInfo: "..utils.toJson(viewInfo))
---     view.table = tableDef and tableDef:new({
---         toJsonColumns = viewInfo.toJsonColumns,
---     })
---     local layoutType = type(view.layout)
---     if layoutType == "string" then
---         view.layoutUri = view.layout
---         view.layout = nil
---     end
---     return view
--- end
 _view.loadView = function(fullName, templatePath)
     local viewInfo = require(fullName)
     if not viewInfo or type(viewInfo) ~= "table" then
@@ -82,68 +107,114 @@ _view.loadView = function(fullName, templatePath)
     if not templatePath then
         return view
     end
-    
+    view.templatePath = templatePath
+    return view
+end
+function _view:createTemplateFunction()
+    local templatePath = self.templatePath
+    if not templatePath then
+        return nil
+    end
     ngx.log(ngx.INFO, "Initializing template file "..templatePath)
     local content, err = utils.read_file(templatePath)
     if not content then
         ngx.log(ngx.ERR, "Failed to  Initialized template "..templatePath..": "..err)
-        return view
-    end
-    view.template = template.compile(content, "no-cache", true)
-    return view
-end
-
-function _view:getKey(params)
-    if self.key then
-        return self.key
-    end
-    if not params or not next(params) then
         return nil
     end
-    return params.key or (#params == 1 and params[1]) or self.table:generateKey(params)
+    return template.compile(content, "no-cache", true)
 end
-function _view:getRecord(conn, params, noLayout)
+function _view:renderPage(context)
+    local templateFunc = self.template
+    if not templateFunc then
+        templateFunc = self:createTemplateFunction()
+        -- if this view output file and doesn't require key, this view should be rendered only once
+        if self.cacheTemplate then
+            self.template = templateFunc
+        end
+    end
+    if templateFunc then
+        return templateFunc(context)
+    end
+    local record = context.record
+    return self.toJson and self:toJson(record) or record:toJson()
+end
+
+function _view:getKey(context)
+    local key = self.key or (self.record and self.record.key) or context.key
+    if key then
+        return key
+    end
+    local params = context.params
+    local err = (not params or not next(params)) and "Cannot generate key. No params provided. View name: "..self.name or
+                (not self.table) and "View table is null. View name: "..self.name or nil
+    if err then
+        return nil, err
+    end
+    key = self.table:generateKey(params)
+    err = (not key) and "Not enough params to generate key for view '"..self.name.."', params: "..utils.toJson(params) or nil
+    return key, err
+end
+---this function can be inherit in ViewInfo to provide more data to the view rendering
+---NOTE: only override this function in case this view has a template file
+---@return table
+function _view:createPageContext(context)
+    return context
+end
+function _view:createLayoutPathParam(context)
+    return ""
+end
+function _view:loadRecord(context)
     if self.record then
         return self.record
     end
-    local key = self:getKey(params)
+    local key = self:getKey(context)
     if not key then
-        return nil, nil, (self.name or "root")..": Cannot generate key. No search params"
+        return nil, (self.name or "root")..": Cannot generate key. No search params"
+    end
+    if not self.table then
+        return nil, (self.name or "root")..": Cannot generate key. No table defined in view"
     end
 
-    local model = self.table:new({conn = conn})
-    ngx.log(ngx.DEBUG, (self.name or "root")..": Loading key "..key)
+    local model = self.table:new({conn = context.conn})
+    --ngx.log(ngx.DEBUG, (self.name or "root")..": Loading key "..key)
     local record, err = model:loadByKey(key)
-    return record, key, err
+    return record, err, key
 end
-function _view:render(params, noLayout)
-    local conn, err = utils.getDbConnection()
+function _view:render(context)
+    local err, recordKey, shouldDisconnect
+    local record, conn = context.record, context.conn
     if not conn then
-        ngx.log(ngx.ERR, (self.name or "root")..": Cannot get connection, "..(err or ""))
-        return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
+        conn, err = utils.getDbConnection()
+        context.conn = conn
+        if not conn then
+            ngx.log(ngx.ERR, (self.name or "root")..": Cannot get connection, "..(err or ""))
+            return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
+        end
+        conn:connect()
+        shouldDisconnect = true
     end
-    conn:connect()
-    local record, key, loadingErr = self:getRecord(conn, params, noLayout)
     if not record then
-        ngx.log(ngx.INFO, "ERR_NOT_FOUND: "..loadingErr)
-        conn:disconnect()
-        return nil, ngx.HTTP_NOT_FOUND
+        record, err, recordKey = self:loadRecord(context)
+        if not record then
+            ngx.log(ngx.INFO, "ERR_NOT_FOUND: "..err..(recordKey and ", key: "..recordKey or ""))
+            if shouldDisconnect then
+                conn:disconnect()
+            end
+            return nil, ngx.HTTP_NOT_FOUND
+        end
+        context.record = record
     end
 
-    if not self.template then
-        conn:disconnect()
-        return self.toJson and self:toJson(record) or record:toJson(), ngx.HTTP_OK
-    end
-    local sHtml = self.template({record = record, main = "{* main *}"}) --> main for layout pre-compile
-    if not noLayout then
-        self.layout =  self.layout or (self.layoutUri and template.compile(self.layoutUri))
-        if self.layout then
-            sHtml = self.layout({main = sHtml, record = record})
-        end
+    local pageContext = self:createPageContext(context)
+    local sHtml = self:renderPage(pageContext) --> main for layout pre-compile
+    if not context.noLayout and self.layoutUri then
+        local pathParam = self:createLayoutPathParam(context)
+        local layoutFunc = template.compile(self.layoutUri..(pathParam or ""))
+        pageContext.main = sHtml
+        sHtml = layoutFunc(pageContext)
     end
 
     conn:disconnect()
     return sHtml, ngx.HTTP_OK
 end
-
 return _view

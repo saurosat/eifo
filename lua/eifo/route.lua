@@ -3,8 +3,8 @@
 --- Created by tnguyen.
 --- DateTime: 9/22/23 9:55 AM
 ---
-
 local utils = eifo.utils
+local RequestContext = require("eifo.RequestContext")
 local viewClass = require("eifo.view")
 local lock = require "eifo.lock"
 local ngx = ngx
@@ -13,7 +13,13 @@ local Route = {}
 function Route:new(routeInfo)
     routeInfo = routeInfo or {}
     routeInfo.pos = routeInfo.pos or 0
-    routeInfo.path = routeInfo.path or ""
+    routeInfo.path = routeInfo.path or "/" --> must start and end with "/"
+    if string.sub(routeInfo.path, 1, 1) ~= "/" then
+        routeInfo.path = "/"..routeInfo.path
+    end
+    if string.sub(routeInfo.path, -1, -1) ~= "/" then
+        routeInfo.path = routeInfo.path.."/"
+    end
     return setmetatable(routeInfo, {__index = self})
 end
 
@@ -22,15 +28,9 @@ function Route:getClass()
     return metatbl and metatbl.__index or nil
 end
 
-function Route:render(params, noLayout)
-    if not self.view then
-        ngx.log(ngx.DEBUG, "Requesting route "..self.path..":"..(self.name or "NA").." has no view")
-        return nil, ngx.HTTP_NOT_FOUND
-    end
-    return self.view:render(params, noLayout)
-end
+function Route:getRoute(uriStr, context)
+    context = context or RequestContext:new({uri = uriStr})
 
-function Route:getRoute(uriStr)
     local startPos, _ , fileExt = string.find(uriStr, "%.(%a+)$")
     if startPos then
         uriStr = string.sub(uriStr, 1, startPos - 1)
@@ -55,16 +55,24 @@ function Route:getRoute(uriStr)
         node = node["index"]
     end
     local pos = node.pos + 1
-    local noLayout = false
+
+    local noLayout
     if pathParams[pos] == "no_layout" then
         pos = pos + 1
-        noLayout = true
+        noLayout = "no_layout"
     end
-    local view = node.view
-    local params = {table.unpack(pathParams, pos)}
-    params = view and {view:getKey(params)} or params
+    context.noLayout = noLayout
 
-    return node, params, noLayout
+    local params = {table.unpack(pathParams, pos)}    
+    if #params > 0 then
+        context.params = params
+        local view = node.view
+        if view then
+            context.key = view:getKey(context)
+        end
+    end
+
+    return node, context
 end
 
 function Route:addView(paths, view, fileExt)
@@ -87,17 +95,17 @@ end
 
 function Route:addRoute(subName, subView)
     subView = subView or {}
-    local subPath = self.name and self.path.."/"..self.name or self.path
+    local subPath = self.name and self.path..self.name.."/" or self.path
 
     local routeKey = subName
-    if subView.outputFile and not subView.key then
+    if subView.outputFile and subView.requireKey then
         local dir = subPath.."/"..subName
         local dirExist, _, code = os.rename(dir, dir) --> check if location exists:
         if not dirExist and code ~= 13 then --> if not, create the dir
             os.execute("mkdir "..dir) --> make dir for any non-view route having child view routea
-            if subView.table then --> real view, not emptyView
+            if subView.name then --> real view, not emptyView
                 os.execute("mkdir "..dir.."/no_layout")
-                subPath = dir
+                subPath = dir.."/"
                 subName = nil
             end
         end
@@ -108,7 +116,7 @@ function Route:addRoute(subName, subView)
         route.path = subPath
         route.name = subName
     else
-        route = Route:new({name = subName, path = subPath, pos = self.pos + 1})
+        route = Route:new({name = subName, path = subPath, pos = self.pos + 1, basePath = self.basePath})
         self[routeKey] = route
     end
     if subView then
@@ -126,7 +134,13 @@ function Route:addRoute(subName, subView)
 end
 function Route:getFileExt()
     if not self.fileExt then
-        self.fileExt = (not self.template and "json") or "html"
+        if self.view and not self.view.templatePath then
+            self.fileExt = "json"
+        else --> if not self.view then self.filePath must exists:
+            local filePath = self.filePath or (self.view and self.view.templatePath)
+            local _, _ , fileExt = filePath and string.find(filePath, "%.view%.(%a+)$") or nil, nil, "html"
+            self.fileExt = fileExt
+        end
     end
     return self.fileExt
 end
@@ -136,55 +150,63 @@ function Route:getContentType()
     end
     return self.contentType
 end
-function Route:getFilePath(params, noLayout)
+function Route:getFilePath(context)
     if self.filePath then
         return self.filePath
     end
-    params = params or {}
+
+    context = context or {}
+    local params
     local view = self.view
     if view then
-        if not view.table or not view.outputFile then
-            return nil, nil
+        if not view.outputFile then
+            return nil
         end
-        if not view.key then
-            local key = params.key or (#params == 1 and params[1]) or view.table:generateKey(params)
-            assert(key, "Not enough params to generate key for view '"..view.name.."', params: "..table.concat(params, ", "))
+        if view.requireKey then
+            local key = view:getKey()
+            if not key then
+                return nil, "Not enough params to generate key for view '"..view.name.."', params: "..utils.toJson(params)
+            end
             params = {key}
+            context.key = key
         else
             params = {}
         end
+    else
+        params = context.params or {}
     end
     if self.name then
         table.insert(params, 1, self.name)
     end
     local num = #params
     if num == 0 then
-        return nil, nil
+        return nil
     end
-    if noLayout then
+    if context.noLayout == "no_layout" then
         params[num + 1] = params[num]
         params[num] = "no_layout"
     end
-    return self.path.."/"..table.concat(params, "/").."."..self:getFileExt()
+    local filePath = (self.basePath or "")..self.path..table.concat(params, "/").."."..self:getFileExt()
+    context.filePath = filePath
+    return filePath
 end
-function Route:loadFromFile(params, noLayout)
-    local filePath = self:getFilePath(params, noLayout)
+function Route:loadFromFile(context)
+    local filePath, err = self:getFilePath(context)
     if not filePath then
-        return nil
+        return nil, err
     end
     local content, fileErr = utils.read_file(filePath)
     if not content then
         ngx.log(ngx.DEBUG, "Cannot read file "..filePath..": "..(fileErr or "Unknown reason"))
     end
-    return content, filePath
+    return content, fileErr
 end
-function Route:saveToFile(renderedText, params, noLayout, outPathFile)
+function Route:saveToFile(renderedText, context)
     if not self.view or not self.view.outputFile then
         return
     end
-    local key = params.key or params[1]
-    outPathFile = outPathFile or self:getFilePath({key}, noLayout)
-    assert(outPathFile, self.view.name..": Cannot get output file for key '"..key.."'")
+    local outPathFile = self:getFilePath(context)
+    assert(outPathFile, self.view.name..": Cannot get output file. context = "..utils.toJson(context))
     local fLock = lock(outPathFile)
     if fLock then -- write renderedText to a static file 
         local f = assert(io.open(outPathFile, "w"))
@@ -195,12 +217,11 @@ function Route:saveToFile(renderedText, params, noLayout, outPathFile)
 end
 function Route:_update(records, oldVals, newVals)
     local record = records[1]
-    local keyObj = {key = record.key}
-    self:removeOutFile(keyObj)
-    self:removeOutFile(keyObj, true)
+    self:removeOutFile({key = record.key})
+    self:removeOutFile({key = record.key, noLayout = "no_layout"})
 end
-function Route:removeOutFile(key, noLayout)
-    local outFile = self:getFilePath({key = key}, noLayout)
+function Route:removeOutFile(context)
+    local outFile = self:getFilePath(context)
     if not outFile then
         return
     end

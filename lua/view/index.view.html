@@ -1,15 +1,7 @@
 <section>
+<!-- {% echo("Test print by resty template ") %} -->
     {%
         local utils = require "eifo.utils"
-        local store = assert(record, "record is nil")
-        local promotions = store.promotions
-        local promoProducts = utils.ArraySet:new()
-        for i = 1, #promotions, 1 do 
-            local promoPrds = promotions[i].promoProducts
-            for j = 1, #promoPrds, 1 do 
-                promoProducts:add(promoPrds[i])
-            end
-        end
         local numPromos = #promoProducts
     %}
     <div class="w-full mx-auto relative">
@@ -40,47 +32,13 @@
                 {%      end %}
                             <a href="/products/detail/{*product.key*}" class="text-lg md:text-2xl bg-black text-white py-2 px-5 mt-10 hover:bg-zinc-800">Shop Now</a>
                         </div>
-                {%      if num >= 4 then 
+                {%      local macroCtx = {imgArray=arr}
+                        if num >= 4 then 
+                            echo(include("/macro/imgGallery/promo_gte4", macroCtx))
+                        else
+                            echo(include("/macro/imgGallery/promo_eq"..tostring(num), macroCtx))
+                        end 
                 %}
-                        <div class="order-2 h-full w-fit flex-shrink-0">
-                            <div class="w-full flex flex-row flex-nowrap overflow-hidden items-end justify-end justify-items-end" >
-                        {%  for i = 1, num, 2 do %}
-                                <img class="h-48 p-1 flex-shrink-0 object-center object-cover" src="{*arr[i]['192x192']*}" alt="">
-                        {%  end %}
-                            </div>
-                            <div class="w-full flex flex-row flex-nowrap overflow-hidden items-end justify-end justify-items-end" >
-                        {%  for i = 2, num, 2 do %}
-                                <img class="h-48 p-1 flex-shrink-0 object-center object-cover" src="{*arr[i]['192x192']*}" alt="">
-                        {%  end %}
-                            </div>
-                        </div>
-                {%      elseif num > 0 then 
-                            local colspans = {"", "", "", ""}
-                            local rowspans = {"", "", "", ""}
-                            local sizes = {"300x300", "300x300", "300x300", "300x300"}
-                            if num == 3 then
-                                rowspans[3] = "row-span-2"
-                                sizes[3] = "600x600"
-                            elseif num == 2 then
-                                rowspans[1] = "row-span-2"
-                                sizes[1] = "600x600"
-                                rowspans[2] = "row-span-2"
-                                sizes[2] = "600x600"
-                            elseif num == 1 then
-                                colspans[1] = "col-span-2"
-                                rowspans[1] = "row-span-2"
-                                sizes[1] = "600x600"
-                            end
-                %}
-                        <div class="order-2 h-96 w-fit grid grid-flow-col grid-cols-2">
-                    {%      for i = 1, num, 1 do
-                    %}
-                            <div class="overflow-hidden bg-gray-200 {*colspans[i]*} {*rowspans[i]*}">
-                                <img src="{*arr[i][sizes[i]]*}" alt="{{product.description}}" class="h-full w-full object-cover object-top group-hover:opacity-75">
-                            </div>
-                    {%      end %}
-                        </div>
-                {%      end %}
                     </div>
                 </div>
             {%      end 
@@ -104,7 +62,7 @@
         <div class="bg-transparent justify-center mx-auto w-full gap-6 container grid grid-flow-row grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" >
         {%
             local products = utils.ArraySet:new()
-            local topCats = store.categories
+            local topCats = record.categories
             for k = 1, #topCats, 1 do
                 local cat = topCats[k]
                 if cat.productCategoryTypeEnumId == 'e.PctCatalog' then
@@ -117,9 +75,8 @@
                             ngx.log(ngx.ERR, (catMems[iP].productId or "catMem product").." is not found")
                         end
                     end
-        %}
-                    {(/category/productCard, {cat = cat})}
-        {%      end  
+                    echo(include("/category/productCard", {record = cat}))
+                end  
             end
         %}
         </div>
