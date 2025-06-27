@@ -1,4 +1,3 @@
---local utf8 = require("lua.utf8")
 local function buildCatMenuData(categories)
     local topCats = {}
     for i = 1, #categories, 1 do 
