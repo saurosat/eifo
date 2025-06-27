@@ -1,6 +1,6 @@
 local utils = require "eifo.utils"
 local Record = require "eifo.db.record.Record"
-local record = Record:createSubClass({className = "Product"})
+local record = Record:createSubClass({className = "Product", i18nCols = utils.ArraySet:new({"productName", "description", "comments"})})
 
 function record:newImageObj(rawFileName)
     return setmetatable({key = rawFileName}, {

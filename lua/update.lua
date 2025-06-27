@@ -25,6 +25,7 @@ local viewableCat = utils.popKey(reqData, "viewable")
 local columnPrefix = utils.popKey(reqData, "columnPrefix")
 local tobeDeleted = utils.popKey(reqData, "delete")
 local storeId = utils.popKey(reqData, "storeId")
+ngx.ctx.lang = utils.popKey(reqData, "language") or "en"
 
 --ngx.log(ngx.DEBUG, utils.toJson(eifo.db.table))
 ngx.status = ngx.HTTP_OK
@@ -58,9 +59,15 @@ if not record then
 end
 ngx.log(ngx.DEBUG, "Table: "..tbl._name..", entityName: "..entityName..", record key: "..record.key..", record: "..(record and utils.toJson(record) or "NIL"))
 
+local currentRecord = tbl:load({key = record.key}, conn)
+if not currentRecord and onAction == "update" then
+    ngx.log(ngx.INFO, "No current record found to update, record key: "..record.key)
+    conn:disconnect()
+    return
+end
+
 local lockKey = "notifyChanges"
 conn:incr(lockKey)
-local currentRecord = tbl:load({key = record.key}, conn)
 local oldVals, newVals, persistErr = record:persist(conn, tobeDeleted)
 if not persistErr then
     if currentRecord then

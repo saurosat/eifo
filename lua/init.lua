@@ -80,8 +80,12 @@ end
 local filePath = pfile:read('*l')
 while filePath do
     local fr, to = string.find(filePath, "%.view%.%a+$")
-    local uri = string.sub(filePath, startPos, fr - 1) --remove ".view.*"
-    templatePaths[uri] = filePath
+    if fr then
+        local uri = string.sub(filePath, startPos, fr - 1) --remove ".view.*"
+        templatePaths[uri] = filePath
+    else
+        ngx.log(ngx.WARN, "Ignoring invalid path "..filePath)
+    end
     filePath = pfile:read('*l')
 end
 pfile:close()

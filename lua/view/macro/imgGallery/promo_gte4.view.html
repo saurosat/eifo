@@ -1,0 +1,12 @@
+<div class="order-2 h-full w-fit flex-shrink-0">
+    <div class="w-full flex flex-row flex-nowrap overflow-hidden items-end justify-end justify-items-end" >
+{%  for i = 1, #imgArray, 2 do %}
+        <img class="h-48 p-1 flex-shrink-0 object-center object-cover" src="{*imgArray[i]['192x192']*}" alt="">
+{%  end %}
+    </div>
+    <div class="w-full flex flex-row flex-nowrap overflow-hidden items-end justify-end justify-items-end" >
+{%  for i = 2, #imgArray, 2 do %}
+        <img class="h-48 p-1 flex-shrink-0 object-center object-cover" src="{*imgArray[i]['192x192']*}" alt="">
+{%  end %}
+    </div>
+</div>

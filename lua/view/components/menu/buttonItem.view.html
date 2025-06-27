@@ -1,0 +1,26 @@
+<!--
+{% --[[
+    auth: true/false
+    svgId: id of svg icon,
+    svgPath: path string of svg icon,
+    icon: url of image icon,
+    title: title of the menu item,
+    desc: description of the menu item,
+    forLoggedIn: true/false,
+    event: name of the event to be triggered,
+    href: url of the menu item,
+    items: array of sub-menu-items,
+ 
+    Notice: string values are passed as strings, so you need to use single quotes in the template.
+    --]]%} 
+--> 
+    
+{%  ngx.log(ngx.DEBUG, "Rendering /components/menu/buttonItem") %}
+<div x-data='new MenuItem( {*eifo.utils.toMenuItemJson(context) *}, $el )'>
+   <div x-show="visible" class="mx-1 hover:bg-gray-200" @click.away="close()" >
+      <button type="button" x-on:click="open()"
+         class="flex items-center gap-x-1 text-sm font-semibold text-gray-300 p-1 rounded-md focus:bg-gray-700 focus::text-white">
+         {{title}}
+      </button>
+   </div>
+</div>

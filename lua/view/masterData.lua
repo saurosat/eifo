@@ -1,4 +1,3 @@
-local utf8 = require("lua.utf8")
 return {
     tableName = "ProductStore",
     key = eifo.storeId,
@@ -10,7 +9,8 @@ return {
         for i = 1, #categories, 1 do 
             local cat = categories[i]
             if cat.productCategoryTypeEnumId == 'e.PctCatalog' and not next(cat.parents) then
-                cat:getTreeDisplayStrs(cats, {productCategoryTypeEnumId = 'e.PctCatalog'}, "+", " ", "+", "+", "+")
+                --cat:getTreeDisplayStrs(cats, {productCategoryTypeEnumId = 'e.PctCatalog'}, "+", " ", "+", "+", "+")
+                cat:getTreeDisplayStrs(cats, {productCategoryTypeEnumId = 'e.PctCatalog'})
             end 
         end 
         local catTreeArray = {}

@@ -71,7 +71,7 @@ class Client {
         this.storeValue("apiKey", apiKey);
     }
     get loggedIn() {
-        return this.store.loggedIn;
+        return this.store.loggedIn ? true : false;
     }
     set loggedIn(isLoggedIn) {
         this.storeValue("loggedIn", isLoggedIn ? true : false);
@@ -137,7 +137,7 @@ class BOClient extends Client {
         }
     }
     get isLoggedIn() {
-        return this.store.isLoggedIn;
+        return this.store.isLoggedIn ? true : false;
     }
 
     get postalAddressMap() {
@@ -476,15 +476,11 @@ class Executor {
         }
         this.isDone = true;
     }
-    update() {
-        this.invoke();
-    }
 }
 class Closable extends Executor {
     constructor(dialog = null, button = null, componentUrl = null) {
         super()
         this.isOpen = false;
-        this.isDone = false;
         this._initialized_ = !this.componentUrl;
         this.setButton(button);
         this.setDialog(dialog);
@@ -510,8 +506,8 @@ class Closable extends Executor {
         }
         return Promise.resolve("Already loaded");
     }
-    toggle() {
-        return this.isOpen ? this.close() : this.open();
+    toggle(button = null) {
+        return this.isOpen ? this.close() : this.open(button);
     }
     open() {
         this.isOpen = true;
@@ -519,16 +515,87 @@ class Closable extends Executor {
     }
     close() {
         this.isOpen = false;
-        if(this.button) this.button.focus();
-        super.invoke();
     }
 }
+
+class MenuItem extends Closable {
+    constructor(menuInfo, htmlEle) {
+        super(htmlEle);
+        if(!menuInfo) menuInfo = {};
+        this.expanded = menuInfo.expanded ? true : false;
+        this.title = menuInfo.title;
+        this.forLoggedIn = menuInfo.forLoggedIn ? true : false;
+        this.event = menuInfo.event;
+        this.href = menuInfo.href;
+        this.icon = menuInfo.icon;
+        this.posStyle = "";
+    }
+
+    updatePosition(button = null) {
+        if(!button) return;
+        this.posStyle = "";
+        let parent = button.parentElement;
+        let parentStyle = getComputedStyle(parent);
+        while(!parentStyle || !parentStyle.getPropertyValue("flex")) {
+            parent = parent.parentElement;
+            parentStyle = getComputedStyle(parent);
+        }
+
+        let direction = parentStyle.getPropertyValue("flex-direction") || "row";
+
+        let midPoint = (window.innerWidth - parent.width) / 2;
+        let isButtonLeft = button.offsetLeft < midPoint;
+        if(direction == "row") {
+            let top = button.offsetTop + button.offsetHeight;
+            this.posStyle += "top: " +  top + "px; ";
+            if(isButtonLeft) {
+                this.posStyle += "right: " + (button.offsetLeft + button.offsetWidth) + "px; ";
+            } else {
+                this.posStyle += "left: " + button.offsetLeft + "px; ";
+            }
+            this.posStyle += "min-width: " + button.offsetWidth + "px; ";
+        } else if(button.offsetLeft < midPoint) {
+            let left = button.offsetLeft + button.offsetWidth;
+            this.posStyle += "left: " + left + "px; ";
+            this.posStyle += "top: " +  button.offsetTop + "px; ";
+        } else {
+            this.posStyle += "right: " + button.offsetLeft + "px; ";
+            this.posStyle += "top: " +  button.offsetTop + "px; ";
+        }
+    }
+    get visible() {
+        // if(!this.userAccount) return true; // for both logged in and not yet logged in
+        // if(this.userAccount.isLoggedIn) return this.forLoggedIn;
+        // return !forLoggedIn;
+        if(this.forLoggedIn == null || this.forLoggedIn == undefined) return true;
+
+        const ua = window.userAccount;
+        return (ua == null && !this.forLoggedIn) || (ua.isLoggedIn == this.forLoggedIn);
+    }
+
+    onAnotherSelected() {
+        this.close();
+    }
+    open(button) {
+        if(this.event) {
+            this.$dispatch(this.event, this);
+        } 
+        if(this.isOpen) return;
+        this.$dispatch("anotherSelected", this);
+        this.updatePosition(button);
+        super.open();
+    }
+    close() {
+        if(!this.isOpen) return;
+        super.close();
+    }
+}
+
 class Dialog extends Closable {
     constructor(dialog = null, button = null, componentUrl = null) {
         super(dialog, button, componentUrl);
         this.isOpen = false;
         this.isLoading = false;
-        this.isDone = false;
         this.isChanged = false;
     }
     close() {
@@ -540,7 +607,6 @@ class Dialog extends Closable {
         this.isLoading = false;
         this.isChanged = this.isDone;
         if(this.button) this.button.focus();
-        // this.isDone = true;
         super.invoke();
     }
 }

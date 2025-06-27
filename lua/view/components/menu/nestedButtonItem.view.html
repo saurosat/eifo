@@ -1,0 +1,33 @@
+<!--
+{% --[[
+    auth: true/false
+    svgId: id of svg icon,
+    svgPath: path string of svg icon,
+    icon: url of image icon,
+    title: title of the menu item,
+    desc: description of the menu item,
+    forLoggedIn: true/false,
+    event: name of the event to be triggered,
+    href: url of the menu item,
+    items: array of sub-menu-items,
+ 
+    Notice: string values are passed as strings, so you need to use single quotes in the template.
+    --]]%} 
+-->
+{%  ngx.log(ngx.DEBUG, "Rendering /components/menu/nestedButtonItem") %}
+<div class="relative mx-1 hover:bg-gray-200" @click.away="close()" 
+      x-data='new MenuItem( {*eifo.utils.toMenuItemJson( context) *}, $el )'>
+{% if title then %}
+   <button type="button" x-on:click="toggle(dialog)"
+      class="flex items-center text-sm font-semibold text-gray-300 p-1 rounded-md focus:bg-gray-700 focus::text-white">
+      {{title}}
+      {(/macro/icon, context)}
+   </button>
+{% end %}
+   <div x-show="isOpen" x-bind:style="posStyle"
+      class="absolute z-20 mt-2 py-0 min-w-20 max-w-md whitespace-nowrap rounded-md bg-white shadow-lg ring-1 ring-gray-900/5">
+{% for _, item in pairs(items) do  %}
+      {(/components/menu/item, item)} 
+{% end %}
+   </div>
+</div>

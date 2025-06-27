@@ -1,0 +1,17 @@
+{%  ngx.log(ngx.DEBUG, "Rendering /components/menu/descLinkItem") %}
+
+<div x-data='new MenuItem( {*eifo.utils.toMenuItemJson( context) *}, $el )'>
+   <div x-show="visible"
+        class="group relative flex gap-x-6 rounded-md text-sm leading-6 mx-1 hover:bg-gray-200">
+        <div class="mt-1 flex h-11 w-11 flex-none items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
+            {(/macro/icon, context)}
+        </div>
+        <div class="flex-auto">
+            <a href="{{href}}" class="block font-semibold text-gray-900">
+                {{title}}
+                <span class="absolute inset-0"></span>
+            </a>
+            <p class="mt-1 text-gray-600">{{desc}}</p>
+        </div>
+    </div>
+</div>

@@ -143,7 +143,8 @@ function _table:generateKey(recordData)
             key = key..sep..assert(ids[i], "Missing ID field "..fnIds[i])
         end
         --ngx.log(ngx.DEBUG, key)
-
+    elseif recordData.pkValue then
+        key = self._prefix..self._p_kSep..recordData.pkValue
     else
         key = self._prefix..self._p_kSep..assert(recordData[fnIds[1]], self._name.."Missing ID field "..fnIds[1].." ID fields: "..utils.toJson(fnIds))
         for i = 2, #fnIds, 1 do

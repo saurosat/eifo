@@ -181,6 +181,7 @@ function _view:loadRecord(context)
     return record, err, key
 end
 function _view:render(context)
+    ngx.log(ngx.DEBUG, "Rendering view "..self.name)
     local err, recordKey, shouldDisconnect
     local record, conn = context.record, context.conn
     if not conn then

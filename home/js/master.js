@@ -57,6 +57,7 @@ document.addEventListener('alpine:init', () => {
         contactMechId: Alpine.$persist('').using(sessionStorage),
         contactNumber: Alpine.$persist('').using(sessionStorage),
         postalAddressMap: Alpine.$persist({}).using(sessionStorage),
+        notifications: Alpine.$persist([]).using(sessionStorage),
 
         isCartLoaded: Alpine.$persist(false),
         paymentsTotal: Alpine.$persist(0),
@@ -69,7 +70,7 @@ document.addEventListener('alpine:init', () => {
         orderHeader: Alpine.$persist({}),
         productsQuantity: Alpine.$persist(0)
     });
-
+    window.userAccount = new UserAccount(Alpine.store('boConfig'));
 
     Alpine.data('cartDialog', (ele, btn) => { 
         if(!window.checkoutForm) {

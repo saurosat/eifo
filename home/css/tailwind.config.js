@@ -1,4 +1,5 @@
 /** @type {import('tailwindcss').Config} */
+const plugin = require('tailwindcss/plugin')
 module.exports = {
   content: ["../../lua/view/**/*.html", "../**/*.{html,js,ts}"],
   presets: [],
@@ -1059,7 +1060,25 @@ module.exports = {
       50: '50',
     },
   },
-  plugins: [],
+  plugins: [
+    plugin(function ({ addUtilities }) {
+      addUtilities({
+        '.scrollbar-hide': {
+          /* IE and Edge */
+          '-ms-overflow-style': 'none',
+
+          /* Firefox */
+          'scrollbar-width': 'none',
+
+          /* Safari and Chrome */
+          '&::-webkit-scrollbar': {
+            display: 'none'
+          }
+        }
+      })
+    })
+
+  ],
   variants: {
     rotate: ['responsive', 'hover', 'focus', 'open', 'group-open'],
     transform: ['responsive', 'open', 'group-open'],

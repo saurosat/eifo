@@ -1,0 +1,9 @@
+{%  ngx.log(ngx.DEBUG, "Rendering /components/menu/linkItem") %}
+<div x-data='new MenuItem( {*eifo.utils.toMenuItemJson( context) *}, $el )'>
+   <div x-show="visible" class="relative rounded-md min-w-20 hover:rounded-none mx-1 hover:bg-gray-200">
+        <a href="{{context.href}}" class="block text-sm font-semibold leading-6 text-gray-900 hover:bg-gray-100">
+            {(/macro/icon, context)}
+            {{ context.title }}
+        </a>
+    </div>
+</div>

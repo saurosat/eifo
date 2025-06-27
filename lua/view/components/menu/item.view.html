@@ -1,0 +1,31 @@
+<!--
+{% --[[
+    auth: true/false
+    svgId: id of svg icon,
+    svgPath: path string of svg icon,
+    icon: url of image icon,
+    title: title of the menu item,
+    desc: description of the menu item,
+    forLoggedIn: true/false,
+    event: name of the event to be triggered,
+    href: url of the menu item,
+    items: array of sub-menu-items,
+ 
+    Notice: string values are passed as strings, so you need to use single quotes in the template.
+    --]]%} 
+-->
+{%  ngx.log(ngx.DEBUG, "Rendering /components/menu/item") %}
+
+{%  if context.items and #context.items > 0 then %}
+    {(/components/menu/nestedButtonItem, context)} 
+{%  elseif context.href then %} 
+    {%  if context.desc then %}
+        {(/components/menu/descLinkItem, context)}
+    {%  elseif context.hrefDemo then %}
+        {(/components/menu/itemWithDemo, context)}
+    {%  else %}
+        {(/components/menu/linkItem, context)}
+    {%  end %}
+{%  else %}
+    {(/components/menu/buttonItem, context)}
+{%  end %}

@@ -1,6 +1,6 @@
 local utils = require "eifo.utils"
 local baseRecord = require "eifo.db.record.Record"
-local record = baseRecord:createSubClass({className = "ProductCategory"})
+local record = baseRecord:createSubClass({className = "ProductCategory", i18nCols = utils.ArraySet:new({"categoryName", "description"})})
 function record:getParents()
     local parents = self:getMetaValue("parents", true) 
     if parents then
@@ -81,11 +81,11 @@ function record:getProducts (catType)
 end
 function record:getTreeDisplayStrs(catArray, subCatFilter, tab, space, bullet, hJoint, vJoint)
     catArray = catArray or {}
-    tab = tab or "\xc2\xbb"
-    space = space or "\xc2\xa0"
-    bullet = bullet or "+" --"├"
-    hJoint = hJoint or "-" -- "─"
-    vJoint = vJoint or "-" --"│"
+    tab = tab or "\\u00a0\\u00a0"
+    space = space or "\\u00a0"
+    bullet = bullet or "\\u251c" --"+" --"├"
+    hJoint = hJoint or "\\u2500" -- "-" -- "─"
+    vJoint = vJoint or "\\u2502" --"-" --"│"
     local tabLen = tab:len()
     local needReplaceByVJoint = (vJoint ~= tab)
 

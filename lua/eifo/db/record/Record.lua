@@ -1,13 +1,28 @@
 local utils = require "eifo.utils"
 
-local _record = {className = "Record"}
+local _record = {className = "Record", i18nCols = utils.ArraySet:new({"name", "title", "description", "shortDesc", "longDesc"})}
+local function __newIndex(self, key, value)
+    local meta = getmetatable(self)
+    if meta.i18nCols:index(key) then
+        local lang = (ngx.ctx.lang or eifo.lang or "en")
+        key = key.."."..lang
+    end
+    rawset(self, key, value)
+end
 
 local function __equal(self, otherRecord)
     return self.key == otherRecord.key
 end
 local function __getByKey(self, sKey)
     --ngx.log(ngx.DEBUG, "Querying key = "..key)
+    if type(sKey) ~= "string" then
+        return nil
+    end
     local meta = getmetatable(self)
+    if meta.i18nCols:index(sKey) then
+        return rawget(self, sKey.."."..(ngx.ctx.lang or eifo.lang or "en"))
+    end
+
     --ngx.log(ngx.DEBUG, "metatable: "..utils.toJson(meta))
     --ngx.log(ngx.DEBUG, "className = "..meta.className)
     local metaValue = meta[sKey]
@@ -110,7 +125,12 @@ function _record:new(tableObj, recordData)
                     record[columnName] = fkId
                 end
             end
+            local i18nCols = self.i18nCols
+            local lang = (ngx.ctx.lang or eifo.lang or "en")
             for key, value in pairs(recordData) do
+                if i18nCols:index(key) then
+                    key = key.."."..lang
+                end
                 record[key] = value
             end
             
@@ -122,7 +142,7 @@ function _record:new(tableObj, recordData)
         error("invalid datatype: "..dataType..". Only hash, array and string is supported")
     end
     
-    local _mt = self:createSubClass({ _table = tableObj, __index = __getByKey, __eq = __equal, isLoaded = false})
+    local _mt = self:createSubClass({ _table = tableObj, __newIndex = __newIndex, __index = __getByKey, __eq = __equal, isLoaded = false})
     return setmetatable(record, _mt)
 end
 function _record:getMetaValue(key, raw)

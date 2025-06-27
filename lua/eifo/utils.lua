@@ -281,6 +281,61 @@ local popKey = function(tbl, key)
     tbl[key] = nil
     return val
 end
+
+local function setPrimitiveValue(obj, value, key, keyAlt)
+    local valueType = type(value)
+    if valueType == "string" or valueType =="number" or valueType =="boolean" then
+        key = type(key) ~= "string" and keyAlt or key
+        if key then
+            obj[key] = value
+        end
+    end
+end
+local function toMenuItemJson(menuItem, cols)
+    local vType = type(menuItem)
+    if vType =="number" or vType == "boolean" then
+        return tostring(menuItem)
+    end
+    if vType == "string" then
+        if menuItem:sub(1, 6) == "window" then
+            return menuItem
+        end
+        if menuItem:sub(1, 8) == "document" then
+            return menuItem
+        end
+        return '"'..menuItem..'"'
+    end
+    if vType ~= "table" then
+        return "null"
+    end
+    if #menuItem > 0 then
+        local json = "["
+        for i = 1, #menuItem, 1 do
+            json = json..toMenuItemJson(menuItem[i], cols)..", "
+        end
+        json = json:sub(1, -3)
+        json = json.."]"
+        return json
+    end
+    local json = "{"
+    if cols then
+        for kFr, kTo in pairs(cols) do
+            local key = type(kFr) ~= "string" and kTo or kFr
+            json = json..key..": "..toMenuItemJson(menuItem[kTo], cols)..", "
+        end
+    else 
+        for key, value in pairs(menuItem) do
+            json = json..key..": "..toMenuItemJson(value, cols)..", "
+        end
+    end
+    if string.len(json) > 3 then
+        json = json:sub(1, -3)    
+    end
+    json = json.."}"
+    return json
+end
+
+
 local mergeRef = function(lTable, rTable)
     if not lTable then
         return rTable
@@ -386,6 +441,7 @@ utils.isHashTbl = isHashTbl
 utils.isTableEmpty = isTableEmpty
 utils.keys = keys
 utils.popKey = popKey
+utils.toMenuItemJson = toMenuItemJson
 utils.removeItem = removeItem
 utils.mergeRef = mergeRef
 utils.listToHash = listToHash

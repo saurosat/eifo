@@ -39,6 +39,18 @@ function Route:getRoute(uriStr, context)
     if pathParams[1] == "api" then
         table.remove(pathParams, 1)
     end
+    if pathParams[#pathParams] == "_EN_"  then
+        ngx.ctx.lang = "en"
+        pathParams[#pathParams] = nil
+    elseif pathParams[#pathParams] == "_VI_" then
+        ngx.ctx.lang = "vi"
+        pathParams[#pathParams] = nil
+    elseif pathParams[#pathParams] == "_CN_" then
+        ngx.ctx.lang = "cn"
+        pathParams[#pathParams] = nil
+    else
+        ngx.ctx.lang = ngx.ctx.lang or "en" --> default language
+    end
     local pathPrefix = fileExt and eifo.pathPrefixes[fileExt]
     if pathPrefix and pathParams[1] ~= pathPrefix  then
         table.insert(pathParams, 1, pathPrefix)

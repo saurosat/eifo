@@ -1,0 +1,15 @@
+{%
+    local alt = alt or "Icon" 
+    local twClass = twClass or "h-5 w-5 flex-none text-gray-400"
+ %}
+{% if icon then %}
+<img class="{{twClass}}" src="{{icon}}" alt="{{alt}}"> 
+{% elseif svgId then %}
+<svg class="{{twClass}}" fill="currentColor" aria-hidden="true">
+   <use href="#{{svgId}}"></use>
+</svg>
+{% elseif svgPath then %}
+<svg class="{{twClass}}" fill="currentColor" aria-hidden="true">
+   <path fill-rule="evenodd" clip-rule="evenodd" d="{*svgPath*}"  />
+</svg>
+{% end %}
