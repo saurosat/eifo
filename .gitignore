@@ -151,3 +151,4 @@ home/img/*/*.gif
 *.tar.lz4
 __*.*
 *.bak
+home/layout/*.html

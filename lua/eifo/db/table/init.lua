@@ -17,13 +17,22 @@ local tables = {
         name = "ProductCategory",
         prefix = "pc",
         fnIds = {"productCategoryId"}, --ID field names
-        fnFKs = {productStoreId = {"ProductStore", "categories"}, productCategoryTypeEnumId = {"Enumeration", "categories"}} -- Foreign key field names
+        fnFKs = {productStoreId = {"ProductStore", "categories"}, productCategoryTypeEnumId = {"Enumeration", "categories"}}, -- Foreign key field names
+        indexFields = {
+            cateegoryName = "TEXT WEIGHT 1.0",
+            description = "TEXT WEIGHT 1.0"
+        }
+
     },
     {
         name = "Product",
         prefix = "p",
         fnIds = { "productId" },
-        fnFKs = {productStoreId = {"ProductStore", "products"}, productTypeEnumId = {"Enumeration", "productsByPType"}, productClassEnumId={"Enumeration", "productsByPClass"}, assetTypeEnumId = {"Enumeration", "productsByAType"}, assetClassEnumId = {"Enumeration", "productsByAClass"}}
+        fnFKs = {productStoreId = {"ProductStore", "products"}, productTypeEnumId = {"Enumeration", "productsByPType"}, productClassEnumId={"Enumeration", "productsByPClass"}, assetTypeEnumId = {"Enumeration", "productsByAType"}, assetClassEnumId = {"Enumeration", "productsByAClass"}},
+        indexFields = {
+            productName = "TEXT WEIGHT 5.0",
+            description = "TEXT WEIGHT 1.0"
+        }
     },
     {
         name = "ProductContent",
@@ -93,8 +102,17 @@ local tables = {
     }
 }
 
+local tblsIndex = {
+    _initIndexes = function (self, conn)
+        local existingIndexes = nil
+        for _, tbl in pairs(self) do
+            existingIndexes = tbl:initIndex(conn, existingIndexes)
+        end
+    end
+}
+
 local Table = require "eifo.db.table.Table"
-local tbls = {}
+local tbls = setmetatable({}, {__index = tblsIndex})
 eifo.db.table = tbls
 for i = 1, #tables, 1 do
     local tbl = Table:new(tables[i])

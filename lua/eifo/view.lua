@@ -93,6 +93,7 @@ local function newView(viewInfo, fullName)
         view.layout = nil
     end
     view.requireKey = not view.key and not view.record
+    view.outputFile = view.outputFile and (view.key or view.requireKey)
     view.cacheTemplate = not view.outputFile or view.requireKey
     return view
 end

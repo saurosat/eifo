@@ -63,6 +63,11 @@ function _table:extend(subClass)
 end
 function _table:new(tableInfo)
     tableInfo = tableInfo or {}
+    --Lazily create indexes
+    if tableInfo.conn and not self.indexInitialized then
+        ngx.log(ngx.INFO, "Initializing indexes")
+        eifo.db.table:_initIndexes(tableInfo.conn)
+    end
     local tbl = {
         key = tableInfo.key,
         recordCommons = tableInfo.commonData or {},
@@ -110,9 +115,53 @@ function _table:new(tableInfo)
     ngx.log(ngx.DEBUG, "Created new table "..tbl._name)
     return tbl
 end
--- function _table:init() 
---     --TODO to be deleted
--- end
+
+---will be called by eifo.db.table:initIndexes
+---@param conn any
+---@param existingIndexes any
+---@return nil
+function _table:initIndex(conn, existingIndexes)
+    if not self.indexFields then
+        self.indexInitialized = true
+        return nil
+    end
+    if not conn or self.indexInitialized then
+        return nil
+    end
+    local indexName = "idx:"..self._prefix
+    ngx.log(ngx.INFO, "Initializing "..indexName)
+    existingIndexes = existingIndexes or conn:ft():_list() or {}
+    for i = 1, #existingIndexes, 1 do
+        if existingIndexes[i] == indexName then
+            self.indexInitialized = true
+            break
+        end
+    end
+    if self.indexInitialized then
+        self.indexInitialized = true
+        return existingIndexes
+    end
+    local indexFields = self.indexFields
+    local key, value = next(indexFields)
+    local params = key and {indexName, "ON", "HASH", "SCHEMA"} or nil
+    while key do
+        local fieldInfo = utils.splitStr(value, " ")            
+        local numInfo = #fieldInfo
+        if numInfo >= 1 then
+            params[#params+1] = key
+            for i = 1, numInfo, 1 do
+                params[#params+1] = fieldInfo[i]
+            end
+        end
+        key, value = next(indexFields, key)
+    end
+    if params then
+        conn:ft():create(table.unpack(params))
+        existingIndexes[#existingIndexes+1] = indexName
+    end
+    self.indexInitialized = true
+    return existingIndexes
+end
 function _table:equal(anotherSchema)
     return anotherSchema and (anotherSchema == self or 
             (self.key and anotherSchema.key == self.key) or 
