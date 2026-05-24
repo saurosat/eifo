@@ -1,0 +1,55 @@
+<svg width="100%" viewBox="0 0 680 620" role="img" xmlns="http://www.w3.org/2000/svg" style="max-width: 680px; display: block; margin-inline: auto;">
+<title>Funny embarrassed face</title>
+<desc>A cartoon yellow face with a big goofy embarrassed grin, raised eyebrows, and sweat drops on the cheeks</desc>
+
+<ellipse cx="340" cy="295" rx="210" ry="215" fill="#FFD166" stroke="#E8A000" stroke-width="4"></ellipse>
+
+<path d="M228,163 Q260,138 295,150" stroke="#7B4F00" stroke-width="7" fill="none" stroke-linecap="round"></path>
+<path d="M385,150 Q420,138 452,163" stroke="#7B4F00" stroke-width="7" fill="none" stroke-linecap="round"></path>
+
+<ellipse cx="262" cy="240" rx="34" ry="36" fill="white" stroke="#E8A000" stroke-width="2"></ellipse>
+<ellipse cx="262" cy="232" rx="20" ry="22" fill="#3D2B00"></ellipse>
+<ellipse cx="268" cy="225" rx="8" ry="8" fill="white"></ellipse>
+<ellipse cx="256" cy="240" rx="3" ry="3" fill="white" opacity="0.6"></ellipse>
+
+<ellipse cx="418" cy="240" rx="34" ry="36" fill="white" stroke="#E8A000" stroke-width="2"></ellipse>
+<ellipse cx="418" cy="232" rx="20" ry="22" fill="#3D2B00"></ellipse>
+<ellipse cx="424" cy="225" rx="8" ry="8" fill="white"></ellipse>
+<ellipse cx="412" cy="240" rx="3" ry="3" fill="white" opacity="0.6"></ellipse>
+
+<ellipse cx="333" cy="302" rx="5" ry="4" fill="#C07000" opacity="0.5"></ellipse>
+<ellipse cx="347" cy="302" rx="5" ry="4" fill="#C07000" opacity="0.5"></ellipse>
+
+<path d="M235,365 Q280,440 340,445 Q400,440 445,365" fill="white" stroke="#C07000" stroke-width="4"></path>
+<path d="M248,366 Q294,386 340,387 Q386,386 432,366" fill="white" stroke="#E0E0E0" stroke-width="1"></path>
+<line x1="282" y1="366" x2="279" y2="385" stroke="#E0E0E0" stroke-width="1.5"></line>
+<line x1="310" y1="366" x2="309" y2="386" stroke="#E0E0E0" stroke-width="1.5"></line>
+<line x1="340" y1="366" x2="340" y2="387" stroke="#E0E0E0" stroke-width="1.5"></line>
+<line x1="370" y1="366" x2="371" y2="386" stroke="#E0E0E0" stroke-width="1.5"></line>
+<line x1="398" y1="366" x2="401" y2="385" stroke="#E0E0E0" stroke-width="1.5"></line>
+<path d="M295,385 Q340,420 385,385" fill="#FF6B8A"></path>
+
+<path d="M218,385 Q224,395 218,402" stroke="#E8A000" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.7"></path>
+<path d="M462,385 Q456,395 462,402" stroke="#E8A000" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.7"></path>
+
+<path d="M235,272 Q242,280 249,272 Q256,264 263,272" stroke="#FF8FAB" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.7"></path>
+<path d="M391,272 Q398,280 405,272 Q412,264 419,272" stroke="#FF8FAB" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.7"></path>
+
+<g fill="#74C0FC" opacity="0.92">
+  <ellipse cx="195" cy="320" rx="11" ry="16"></ellipse>
+  <path d="M195,299 Q188,312 195,320 Q202,312 195,299" fill="#74C0FC"></path>
+  <ellipse cx="175" cy="365" rx="8" ry="12"></ellipse>
+  <path d="M175,349 Q169,359 175,365 Q181,359 175,349" fill="#74C0FC"></path>
+  <ellipse cx="200" cy="405" rx="6" ry="9"></ellipse>
+  <path d="M200,393 Q195,400 200,405 Q205,400 200,393" fill="#74C0FC"></path>
+
+  <ellipse cx="485" cy="320" rx="11" ry="16"></ellipse>
+  <path d="M485,299 Q478,312 485,320 Q492,312 485,299" fill="#74C0FC"></path>
+  <ellipse cx="505" cy="365" rx="8" ry="12"></ellipse>
+  <path d="M505,349 Q499,359 505,365 Q511,359 505,349" fill="#74C0FC"></path>
+  <ellipse cx="480" cy="405" rx="6" ry="9"></ellipse>
+  <path d="M480,393 Q475,400 480,405 Q485,400 480,393" fill="#74C0FC"></path>
+</g>
+
+<text x="340" y="538" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="22" font-weight="bold" fill="#C0392B">Sorry, I forgot to take a picture</text>
+</svg>

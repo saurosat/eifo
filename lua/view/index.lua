@@ -2,7 +2,7 @@ local utils = require "eifo.utils"
 
 return {
     tableName = "ProductStore",
-    key = "store.p56586a9f100000",
+    key = eifo.storeId,
     layout = "/layout/master",
     outputFile = false,
     createPageContext = function (self, context)

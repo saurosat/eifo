@@ -2,12 +2,14 @@ local utils = require "eifo.utils"
 
 local recordBaseClass = require "eifo.db.record.Record"
 
-local lTblIndex = function (self, tableName)
+local lTblIndex = function (self, tableName) -- self is _leftTables object
     local parentTbl = self.parent
     local loadedTbls = parentTbl.tblRegistry
     local lTbl = loadedTbls[tableName]
     if not lTbl then
-        local tblClass = assert(eifo.db.table[tableName], tableName.." table definition is not found")
+        --local tblClass = assert(eifo.db.table[tableName], tableName.." table definition is not found")
+        local classRegistry = getmetatable(parentTbl).tblRegistry
+        local tblClass = assert(classRegistry[tableName], tableName.." table definition is not found")
         lTbl = tblClass:new({conn = assert(parentTbl.conn, parentTbl._name..".conn == nil "), tblRegistry = loadedTbls})
     end
     lTbl._rightTables[parentTbl._name] = parentTbl
@@ -19,7 +21,9 @@ local rTblIndex = function (self, tableName)
     local loadedTbls = parentTbl.tblRegistry
     local rTbl = loadedTbls[tableName]
     if not rTbl then
-        rTbl = eifo.db.table[tableName]:new({conn = assert(parentTbl.conn, parentTbl._name..".conn == nil "), tblRegistry = loadedTbls})
+        local classRegistry = getmetatable(parentTbl).tblRegistry
+        local tblClass = assert(classRegistry[tableName], tableName.." table definition is not found")
+        rTbl = tblClass:new({conn = assert(parentTbl.conn, parentTbl._name..".conn == nil "), tblRegistry = loadedTbls})
     end
     rTbl._leftTables[parentTbl._name] = parentTbl
     self[tableName] = rTbl
@@ -63,12 +67,13 @@ function _table:extend(subClass)
 end
 function _table:new(tableInfo)
     tableInfo = tableInfo or {}
-    --Lazily create indexes
-    if tableInfo.conn and not self.indexInitialized then
-        ngx.log(ngx.INFO, "Initializing indexes")
-        eifo.db.table:_initIndexes(tableInfo.conn)
+    local tblName = self._name or tableInfo.name
+    assert(tblName, "table name is missing in table schema")
+    if tableInfo.tblRegistry and tableInfo.tblRegistry[tblName] then
+        return tableInfo.tblRegistry[tblName]
     end
     local tbl = {
+        _name = tblName,
         key = tableInfo.key,
         recordCommons = tableInfo.commonData or {},
         groupBy = {},
@@ -77,10 +82,8 @@ function _table:new(tableInfo)
         __keys = {} --> overwrite ArraySet.__keys
     }
     if not self._name then
-        tbl._name = assert(tableInfo.name, "table name is missing in table schema")
-        local ok, recordClass = pcall(require, "eifo.db.record."..tbl._name)
+        local ok, recordClass = pcall(require, "eifo.db.record."..tblName)
         tbl._record = ok and recordClass or recordBaseClass
-        -- ngx.log(ngx.INFO, "Table "..tbl._name..", record class: "..tbl._record.className)
     end
     if not self._alias then
         tbl._alias = tableInfo.alias or tbl._name
@@ -92,6 +95,9 @@ function _table:new(tableInfo)
         local fnIds = assert(tableInfo.fnIds, "fnIds is missing in table schema")
         tbl._fnIds = utils.ArraySet:new(fnIds)
     end
+    if tableInfo.indexFields and next(tableInfo.indexFields) then
+        tbl.indexFields = tableInfo.indexFields
+    end
 
     tbl._leftTables = setmetatable({parent = tbl}, {__index = lTblIndex})
     if not self._leftCols then
@@ -99,7 +105,7 @@ function _table:new(tableInfo)
     else
         for colName, _ in pairs(self._leftCols) do
             tbl.groupBy[colName] = {}
-        end    
+        end
     end
 
     tbl._rightTables = setmetatable({parent = tbl}, {__index = rTblIndex})
@@ -107,61 +113,13 @@ function _table:new(tableInfo)
         tbl._rightCols = {}
     end
     if tableInfo.toJsonColumns then
-        ngx.log(ngx.DEBUG, "tableInfo.toJsonColumns = "..table.concat(tableInfo.toJsonColumns, ", "))
         tbl.toJsonColumns = tableInfo.toJsonColumns
     end
     tbl = self:extend(tbl)
     tbl.tblRegistry[tbl._name] = tbl
-    ngx.log(ngx.DEBUG, "Created new table "..tbl._name)
     return tbl
 end
 
----will be called by eifo.db.table:initIndexes
----@param conn any
----@param existingIndexes any
----@return nil
-function _table:initIndex(conn, existingIndexes)
-    if not self.indexFields then
-        self.indexInitialized = true
-        return nil
-    end
-    if not conn or self.indexInitialized then
-        return nil
-    end
-    local indexName = "idx:"..self._prefix
-    ngx.log(ngx.INFO, "Initializing "..indexName)
-    existingIndexes = existingIndexes or conn:ft():_list() or {}
-    for i = 1, #existingIndexes, 1 do
-        if existingIndexes[i] == indexName then
-            self.indexInitialized = true
-            break
-        end
-    end
-    if self.indexInitialized then
-        self.indexInitialized = true
-        return existingIndexes
-    end
-    local indexFields = self.indexFields
-    local key, value = next(indexFields)
-    local params = key and {indexName, "ON", "HASH", "SCHEMA"} or nil
-    while key do
-        local fieldInfo = utils.splitStr(value, " ")            
-        local numInfo = #fieldInfo
-        if numInfo >= 1 then
-            params[#params+1] = key
-            for i = 1, numInfo, 1 do
-                params[#params+1] = fieldInfo[i]
-            end
-        end
-        key, value = next(indexFields, key)
-    end
-    if params then
-        conn:ft():create(table.unpack(params))
-        existingIndexes[#existingIndexes+1] = indexName
-    end
-    self.indexInitialized = true
-    return existingIndexes
-end
 function _table:equal(anotherSchema)
     return anotherSchema and (anotherSchema == self or 
             (self.key and anotherSchema.key == self.key) or 
@@ -178,10 +136,8 @@ function _table:setMetaValue(key, value)
 end
 function _table:generateKey(recordData)
     if recordData.key then
-        --ngx.log(ngx.DEBUG, "Key already exists: "..recordData.key)
         return recordData.key
     end
-    --ngx.log(ngx.DEBUG, "Generate key from "..utils.toJson(recordData))
     local fnIds = self._fnIds
     local sep = self._k_kSep
     local key
@@ -191,7 +147,6 @@ function _table:generateKey(recordData)
         for i = 2, #fnIds, 1 do
             key = key..sep..assert(ids[i], "Missing ID field "..fnIds[i])
         end
-        --ngx.log(ngx.DEBUG, key)
     elseif recordData.pkValue then
         key = self._prefix..self._p_kSep..recordData.pkValue
     else
@@ -200,7 +155,6 @@ function _table:generateKey(recordData)
             key = key..sep..assert(recordData[fnIds[i]], "Missing ID field"..fnIds[i])
         end
     end
-    --ngx.log(ngx.DEBUG, key)
 
     return key
 end
@@ -218,14 +172,12 @@ function _table:loadByKey(recordKey, nowEpoch)
     if record then
         return record
     end
-    --ngx.log(ngx.DEBUG, self._name.." loading key "..recordKey)
     local conn = self.conn
     record = self._record:new(self, {key = recordKey})
     record, err = record:load(conn)
     if not record then
         local errMsg = "Record not found: "..recordKey..(err and ": "..err or "")
-        --ngx.log(ngx.DEBUG, errMsg)
-        return nil, err
+        return nil, errMsg
     end
 
     --> Remove expired records
@@ -253,11 +205,34 @@ function _table:getRightRelKey(joinAlias, leftRecordKey)
     local tbl = self._rightTables[joinInfo[1]]
     return tbl:getLeftRelKey(joinInfo[2], leftRecordKey)
 end
+
+function _table:loadByKeywords(keywords, nowEpoch)
+    local conn = assert(self.conn, self._name.." has no connection")
+    local res, err = eifo.indexes:search(self, keywords, conn)
+    if not res then
+        return nil, err or "Unknown error"
+    end
+    if #res == 0 then
+        return nil, "No records found"
+    end
+    local group = utils.ArraySet:new()
+    for i = 1, #res, 1 do
+        local recordKey = res[i]
+        local record, loadErr = self:loadByKey(recordKey, nowEpoch)
+        if record then
+            group:add(record)
+        else
+            utils.logWarn("Record not found by key: "..recordKey..", loadErr: "..(loadErr or "nil"))
+        end
+    end
+    if self.onLoaded then
+        self:onLoaded(table.unpack(group))
+    end
+    return group
+end
 function _table:loadByFk(fKeyColumn, fKeyValue, nowEpoch)
-    --ngx.log(ngx.DEBUG, self._name..":loadByFk "..fKeyColumn.."= "..fKeyValue)
     if not self.groupBy[fKeyColumn] then
         local msg = "Column "..fKeyColumn.." is not a foreign key"
-        ngx.log(ngx.ERR, msg)
         return nil, msg
     end
     local group = self.groupBy[fKeyColumn][fKeyValue]
@@ -266,7 +241,6 @@ function _table:loadByFk(fKeyColumn, fKeyValue, nowEpoch)
         self.groupBy[fKeyColumn][fKeyValue] = group
     end
     if group.isLoadedAll then
-        --ngx.log(ngx.DEBUG, "Already loaded: loadByFk "..fKeyColumn.."= "..fKeyValue)
         return group
     end
     group.isLoadedAll = true
@@ -277,7 +251,7 @@ function _table:loadByFk(fKeyColumn, fKeyValue, nowEpoch)
     local conn = assert(self.conn, self._name.." has no connection")
     local keys = conn:sgetall(relkey)
     if not keys then
-        ngx.log(ngx.DEBUG, "FK not found "..fKeyColumn.."= "..fKeyValue)
+        utils.logWarn("FK not found "..fKeyColumn.."= "..fKeyValue)
         return group
     end
     for i = 1, #keys, 1 do
@@ -285,7 +259,7 @@ function _table:loadByFk(fKeyColumn, fKeyValue, nowEpoch)
         if record then
             group:add(record)
         else
-            ngx.log(ngx.DEBUG, "Key not found :"..keys[i])
+            utils.logWarn(keys[i].." not found :"..(loadErr or "Unknown error"))
         end
     end
     if self.onLoaded then
@@ -296,7 +270,6 @@ end
 function _table:toJson()
     local json = "{ \n\r"
     for i = 1, #self, 1 do
-        --ngx.log(ngx.DEBUG, "Record "..i..": "..(self[i].key or "NIL"))
         json = json.."'"..self[i].key.."': "..self[i]:toJson()..",\n\r"
     end
     json = json.."}"
@@ -304,28 +277,27 @@ function _table:toJson()
 end
 function _table:select(where)
     local sFunction = "local f = function(entity) return "..where.." end return f"
-    local fWhere = loadstring(sFunction)
+    local fWhere = load(sFunction)
     assert(fWhere)
     fWhere = fWhere()
-    ngx.log(ngx.DEBUG, utils.toString(fWhere))
+    --utils.logDebug(utils.toString(fWhere))
     local numRecords = #self
     local records = utils.newTable(numRecords, 0)
     for i = 1, numRecords, 1 do
         local pass = fWhere(self[i])
-        ngx.log(ngx.DEBUG, pass and "PASS" or "FAILED")
         -- if not status then
-        --     ngx.log(ngx.ERR, "Filter "..utils.toString(fWhere).." can not be evaluated")
+        --     utils.logError("Filter "..utils.toString(fWhere).." can not be evaluated")
         --     return false
         -- end
         if pass then
             records[#records+1] = self[i]
         --     if not selfInstance[i].parents then
-        --         ngx.log(ngx.DEBUG, "Record "..selfInstance[i].key.." has no parents")
+        --         utils.logDebug("Record "..selfInstance[i].key.." has no parents")
         --     else
-        --         ngx.log(ngx.DEBUG, "Record "..selfInstance[i].key.." has "..(#selfInstance[i].parents).." parents")
+        --         utils.logDebug("Record "..selfInstance[i].key.." has "..(#selfInstance[i].parents).." parents")
         --     end
         -- else
-        --     ngx.log(ngx.DEBUG, "Record "..selfInstance[i].key.." is filtered out")
+        --     utils.logDebug("Record "..selfInstance[i].key.." is filtered out")
         end
     end
     return records

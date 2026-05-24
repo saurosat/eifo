@@ -11,12 +11,19 @@ local utils = eifo.utils
 local bit = require("bit")
 
 local store = utils.newTable(0, 12)
-store.load = function(self)
-    local conn = eifo.db.conn.redis()
-    conn:connect()
+store.load = function(self, conn)
+    local shouldDisconnect = false
+    conn = conn or ngx.ctx.conn
+    if not conn then
+        conn = eifo.db.conn.redis()
+        conn:connect()
+        shouldDisconnect = true
+    end 
     local storeTable = eifo.db.table.ProductStore:new({conn = conn})
     local record = storeTable:load({key = self.storeId}, conn)
-    conn:disconnect()
+    if shouldDisconnect then
+        conn:disconnect()
+    end
     if record then
         for k, v in pairs(record) do
             self[k] = v
@@ -69,14 +76,38 @@ store.getClientIp = function(self)
         end
     end
     if(ip == nil) then
-        return ngx.var.remote_addr
+        return var.remote_addr
     end
     return ip
 end
-store.getProductImageFileNames = function (self, pseudoId)
+store.extractImgInfo = function(self, fileName)
+    local nameParts = {}
+    for part in string.gmatch(fileName, "([^/%.]+)") do
+        nameParts[#nameParts+1] = part
+    end
+    local numParts = #nameParts
+    if numParts < 3 then
+        return nil, nil, nil, nil, nil, nil
+    end
+    local ext = nameParts[numParts] -- index 5 or 3
+    local pseudoId = nameParts[1]
+    local ori = nameParts[2]
+    local size, sig, sFeature = nil, nil, nil
+    if numParts >= 5 then
+        -- Get two second last parts as sig and size
+        size = nameParts[numParts - 1]
+        sig = nameParts[numParts - 2]
+        if numParts > 5 then
+            sFeature = nameParts[3]
+        end
+    end
+    return pseudoId, ori, ext, sig, size, sFeature
+end
+store.reloadPImgFNames = function(self, pseudoId)
+    ngx.log(ngx.INFO, "Reloading image fileNames for product "..pseudoId)
+
     local path = eifo.basePath.."/home/img/"..pseudoId.."*"
     local cmd = "find "..path.." -maxdepth 1"
-    ngx.log(ngx.DEBUG, cmd)
     local pfile, err = io.popen(cmd, "r")
     if not pfile then
         ngx.log(ngx.DEBUG, err or "Can not open directory")
@@ -85,14 +116,43 @@ store.getProductImageFileNames = function (self, pseudoId)
     local list = pfile:read('*a')
     -- ngx.log(ngx.DEBUG, list)
     pfile:close()
-    local fileNames, idx = {}, 1
+    local fileNames = {}
     --for fileName in list:gmatch(pseudoId.."/([^/]+)[\r\n]") do
     for fileName in list:gmatch("("..pseudoId.."[^/]*/[^/]+%.%a%a%a%a?)[\r\n]*") do
-        ngx.log(ngx.DEBUG, "Matched file name: "..fileName)
-        fileNames[idx] = fileName
-        idx = idx + 1
+        -- ngx.log(ngx.DEBUG, "Matched file name: "..fileName)
+        fileNames[#fileNames+1] = fileName
     end
+    self.pImgFNames[pseudoId] = fileNames
     return fileNames
+end
+store.getProductImageFileNames = function (self, pseudoId)
+    local sFeatures = nil
+    local patternPrefix = "%.%a*"
+    local sAllFeatures = string.match(pseudoId, patternPrefix.."$")
+    if sAllFeatures and string.len(sAllFeatures) > 1 then
+        pseudoId = string.sub(pseudoId, 1, #pseudoId - #sAllFeatures)
+        sFeatures = utils.splitStr(sAllFeatures:sub(2), "_")
+    end
+
+    local fileNames = self.pImgFNames[pseudoId] or self:reloadPImgFNames(pseudoId)
+    if not fileNames or #fileNames == 0 or not sFeatures or #sFeatures == 0 then
+        return fileNames
+    end
+    local assocImgFNames = {}
+    for i = 1, #fileNames, 1 do
+        local fileName = fileNames[i]
+        for j = 1, #sFeatures, 1 do
+            local pattern = patternPrefix..sFeatures[j]..".*%.%a+$"
+            if not string.find(fileName, pattern) then
+                fileName = nil
+                break
+            end
+        end
+        if fileName then
+            assocImgFNames[#assocImgFNames+1] = fileName
+        end
+    end
+    return assocImgFNames
 end
 store.getResizedImgUrl = function (self, originFileName, size)
     local pseudoId, fileName, ext = originFileName:match("^/([^%.]+)/([^%.]+)%.([^%.]+)$")
@@ -154,4 +214,5 @@ store.ipHeaders[8] = "HTTP_FORWARDED_FOR"
 store.ipHeaders[9] = "HTTP_FORWARDED"
 store.ipHeaders[10] = "HTTP_VIA"
 store.ipHeaders[11] = "REMOTE_ADDR"
+store.pImgFNames = {}
 return store

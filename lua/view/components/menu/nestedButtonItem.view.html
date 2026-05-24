@@ -14,7 +14,6 @@
     Notice: string values are passed as strings, so you need to use single quotes in the template.
     --]]%} 
 -->
-{%  ngx.log(ngx.DEBUG, "Rendering /components/menu/nestedButtonItem") %}
 <div class="relative mx-1 hover:bg-gray-200" @click.away="close()" 
       x-data='new MenuItem( {*eifo.utils.toMenuItemJson( context) *}, $el )'>
 {% if title then %}
@@ -28,6 +27,25 @@
       class="absolute z-20 mt-2 py-0 min-w-20 max-w-md whitespace-nowrap rounded-md bg-white shadow-lg ring-1 ring-gray-900/5">
 {% for _, item in pairs(items) do  %}
       {(/components/menu/item, item)} 
+{% end %}
+{% if context.productCategoryTypeEnumId == 'PctService' or (context.demoLink and context.demoText) then  %}
+      <div class="grid grid-cols-2 divide-x divide-gray-900/5 bg-gray-50 mx-1 hover:bg-gray-200">
+{%  local demoLink = context.demoLink
+    local demoText = context.demoText or "Watch Demo"
+    local ctaLink = context.ctaLink or ("/category/"..context.storeCategoryTypeEnumId.."/"..context.productCategoryId)
+    local ctaText = context.ctaText or context.title
+ %}
+ {% if demoLink then %}
+        <a href="{{demoLink}}" class="flex items-center justify-center gap-x-2.5 p-3 text-sm font-semibold leading-6 text-gray-900 hover:bg-gray-100">
+            {(/macro/icon, context)}
+            {{ demoText }}
+        </a>
+ {% end %}
+        <a href="{{context.ctaLink}}" class="flex items-center justify-center gap-x-2.5 p-3 text-sm font-semibold leading-6 text-gray-900 hover:bg-gray-100">
+            {(/macro/icon, context)}
+            {{ ctaText }}
+        </a>
+      </div>
 {% end %}
    </div>
 </div>

@@ -3,6 +3,7 @@
     {%
         local utils = require "eifo.utils"
         local numPromos = #promoProducts
+        if numPromos > 0 then
     %}
     <div class="w-full mx-auto relative">
         <div x-data="(new Carousel($el.children[0], true))" class="relative w-full overflow-x-hidden shadow-2xl rounded pt-96">
@@ -57,6 +58,7 @@
             </div>
         </div>
     </div>
+    {%  end %}
 
     <div class="bg-transparent mt-5 justify-items-center w-full">
         <div class="bg-transparent justify-center mx-auto w-full gap-6 container grid grid-flow-row grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" >

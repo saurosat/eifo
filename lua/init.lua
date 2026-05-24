@@ -1,5 +1,5 @@
 eifo.utils = require "eifo.utils"
-
+local ngx = ngx
 setmetatable(eifo, {__index = function(tbl, key)
     local lazyObj = tbl._lazyObjs[key]
     if lazyObj then
@@ -11,8 +11,12 @@ setmetatable(eifo, {__index = function(tbl, key)
     return nil
 end})
 eifo.basePath = ngx.config.prefix()
+if string.sub(eifo.basePath, -1) == '/' then
+    eifo.basePath = string.sub(eifo.basePath, 1, -2) -- remove last slash
+end
 eifo._lazyObjs = {}
 eifo._lazyObjs["store"] = require "eifo.store"
+eifo._lazyObjs["indexes"] = require "eifo.indexes"
 eifo.contentTypes = {
     json = "application/json; charset=utf-8",
     xml = "application/xml; charset=utf-8",
@@ -64,57 +68,53 @@ end
 
 local viewPath = eifo.basePath.."/lua/view"
 local startPos = string.len(viewPath) + 1
-local templatePaths = {}
 
 ngx.log(ngx.INFO, "Base path: "..eifo.basePath)
 
-eifo.route = Route:new{pos=0, basePath=eifo.basePath.."/home"}
+eifo.route = Route:new({pos=0, basePath=eifo.basePath.."/home"})
 
-local cmd = "find "..viewPath.." -name '*.view.*'"
-ngx.log(ngx.INFO, "Searching views: "..cmd)
+local templatePaths = {}
+do
+    local cmd = "find "..viewPath.." -name '*.view.*'"
+    ngx.log(ngx.INFO, "Searching all templates: "..cmd)
+    local pfile, err = io.popen(cmd, "r")
+    if not pfile then
+        ngx.log(ngx.DEBUG, err or ("Can not open directory: "..viewPath))
+        return nil, err
+    end
+    local templatePath = pfile:read('*l')
+    while templatePath do
+        local fr, _ = string.find(templatePath, "%.view%.%a+$")
+        if fr then
+            local uri = string.sub(templatePath, startPos, fr - 1) --remove ".view.*"
+            templatePaths[uri] = templatePath
+        else
+            ngx.log(ngx.WARN, "Ignoring invalid path "..templatePath)
+        end
+        templatePath = pfile:read('*l')
+    end
+    pfile:close()
+end
+
+local cmd = "find "..viewPath.." -name '*.lua'"
 local pfile, err = io.popen(cmd, "r")
 if not pfile then
     ngx.log(ngx.DEBUG, err or ("Can not open directory: "..viewPath))
     return nil, err
 end
-local filePath = pfile:read('*l')
-while filePath do
-    local fr, to = string.find(filePath, "%.view%.%a+$")
-    if fr then
-        local uri = string.sub(filePath, startPos, fr - 1) --remove ".view.*"
-        templatePaths[uri] = filePath
-    else
-        ngx.log(ngx.WARN, "Ignoring invalid path "..filePath)
-    end
-    filePath = pfile:read('*l')
-end
-pfile:close()
+local luaPath = pfile:read('*l')
+while luaPath do
+    ngx.log(ngx.INFO, "Initializing view "..luaPath)
+    local uri = string.sub(luaPath, startPos, -5) --remove .lua
 
-cmd = "find "..viewPath.." -name '*.lua'"
-pfile, err = io.popen(cmd, "r")
-if not pfile then
-    ngx.log(ngx.DEBUG, err or ("Can not open directory: "..viewPath))
-    return nil, err
-end
-filePath = pfile:read('*l')
-while filePath do
-    ngx.log(ngx.INFO, "Initializing view "..filePath)
-    local uri = string.sub(filePath, startPos, -5) --remove .lua
-    local paths = eifo.utils.splitStr(string.sub(uri, 1), "/")
-    local viewName = "view."..table.concat(paths, ".")
-    local templatePath = templatePaths[uri]
-    local view = View.loadView(viewName, templatePath)
-    templatePaths[uri] = nil
+    local view, paths = View.loadView(uri, templatePaths[uri])
+    templatePaths[uri] = nil --> remove from templatePaths, as it is already processed
     if view then
-        local fileExt
-        if templatePath then
-            _, _ , fileExt = string.find(templatePath, "%.view%.(%a+)$")
-        end
-        eifo.route:addView(paths, view, fileExt)
+        eifo.route:addView(paths, view)
     else
         ngx.log(ngx.WARN, "Ignored view "..table.concat(paths, "/")..": empty or invalid view configuration")
     end
-    filePath = pfile:read('*l')
+    luaPath = pfile:read('*l')
 end
 pfile:close()
 

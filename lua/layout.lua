@@ -1,3 +1,5 @@
+local ngx = ngx
+
 if not eifo.view.layout then
     ngx.log(ngx.ERR, "root view is not initialized")
     eifo.utils.responseError(ngx.HTTP_SERVICE_UNAVAILABLE, "Service is temporarily down")

@@ -3,6 +3,7 @@
 --- Created by tnguyen.
 --- DateTime: 9/14/23 5:00 PM
 ---
+local ngx = ngx
 ngx.log(ngx.INFO, "Initilizing utils...")
 local newTable, newArray, newHashTbl
 if table["new"] then
@@ -146,6 +147,9 @@ local function toString(v, kvSep, newLine, refs)
 end
 
 local function timeFromDbStr(dbDateTimeStr)
+    if not dbDateTimeStr or dbDateTimeStr == "_NA_" then
+        return nil
+    end
     ngx.log(ngx.DEBUG, dbDateTimeStr)
     local pattern = "(%d+)-(%d+)-(%d+) (%d+):(%d+):?(%d*)"
     local year, month, day, hour, minute, second = dbDateTimeStr:match(pattern)
@@ -426,7 +430,7 @@ local read_file = function(path)
     return content, err
 end
 
-local utils = newTable(0, 35)
+local utils = newTable(0, 40)
 utils.read_file = read_file
 utils.sourceCode = sourceCode
 utils.splitStr = splitStr
@@ -450,6 +454,18 @@ utils.toString = toString
 utils.toJson = toJson
 utils.addIfNotExist = addIfNotExist
 utils.timeFromDbStr = timeFromDbStr
+utils.logInfo = function(msg)
+    ngx.log(ngx.INFO, msg or "nil")
+end
+utils.logDebug = function(msg)
+    ngx.log(ngx.DEBUG, msg or "nil")
+end
+utils.logError = function(msg)
+    ngx.log(ngx.ERR, msg or "nil")
+end
+utils.logWarn = function(msg)
+    ngx.log(ngx.WARN, msg or "nil")
+end
 utils.printTable = function(tbl)
     if not tbl then
         ngx.say("Table is null")
@@ -472,8 +488,12 @@ end
 utils.lifo = lifo
 
 utils.responseError = responseError
-utils.getDbConnection = function ()
-    return eifo.db.conn.redis()
+utils.mkdir = function(path)
+    local ok, err = os.execute("mkdir -p "..path)
+    if not ok then
+        return nil, err
+    end
+    return true
 end
 utils.cloneHashTbl = function(hTable, resultTable, refs)
     for key, value in pairs(hTable) do
@@ -531,9 +551,7 @@ function utils.ArraySet:index(itemOrKey)
     return self.__keys[itemKey]
 end
 function utils.ArraySet:keys(itemOrKey)
-    --ngx.log(ngx.DEBUG, "ArrraySet:keys "..utils.toString(itemOrKey))
-    local itemKey = itemOrKey[self._fnKey] or itemOrKey
-    local idx = self.__keys[itemKey]
+    local idx = self:index(itemOrKey)
     return idx and self[idx] or nil
 end
 
@@ -568,12 +586,28 @@ function utils.ArraySet:new(array, nameOfKeyField)
     end
     arraySet.__keys = {}
     for i = 1, #arraySet, 1 do
-        local key = arraySet[i][nameOfKeyField] or arraySet[i]
+        local key = nameOfKeyField and arraySet[i][nameOfKeyField] or arraySet[i]
         arraySet.__keys[key] = i
     end
     setmetatable(arraySet, self)
     self.__index = self
     return arraySet
+end
+
+function utils.ArraySet:reset(array, nameOfKeyField)
+    array = array or {}
+    self.__keys = {}
+    if nameOfKeyField then
+        self._fnKey = nameOfKeyField
+    end
+    for i = 1, #array, 1 do
+        local key = nameOfKeyField and array[i][nameOfKeyField] or array[i]
+        self.__keys[key] = i
+        self[i] = array[i]
+    end
+    for i = #self, #array + 1, -1 do
+        self[i] = nil
+    end
 end
 
 utils.observable = {

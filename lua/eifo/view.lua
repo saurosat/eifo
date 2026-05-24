@@ -3,7 +3,7 @@
 --- Created by tnguyen.
 --- DateTime: 9/22/23 9:55 AM
 ---
-
+local ngx = ngx
 local utils = eifo.utils
 local lock = require "eifo.lock"
 local template = require("resty.template")
@@ -12,7 +12,11 @@ template.load = function (viewSrc, plain)
     local route, content, context, err
     route, context = eifo.route:getRoute(viewSrc, context) --> always not nil
     content, err = route:loadFromFile(context)
-    assert(not err, err)
+    --assert(not err, err)
+    if err then
+        ngx.log(ngx.ERR, "Cannot load route from file: "..viewSrc..", err: "..err)
+        return content or err or "Cannot load content from file"
+    end
     if content then
         return content
     end
@@ -34,39 +38,6 @@ template.load = function (viewSrc, plain)
     return content
 end
 
--- template.process = function (viewSrc, context, cache_key, plain)
---     assert(viewSrc, "view was not provided for template.process(view, context, cache_key, plain)")
---     if plain == true then
---         return template.compile(viewSrc, cache_key, plain)(context)
---     end
-    
---     local route, content, err
---     route, context = eifo.route:getRoute(viewSrc, context) --> always not nil
---     content, err = route:loadFromFile(context)
---     assert(not err, err)
---     if content then
---         return content
---     end
---     -- if not content then: 
---     local view = route.view
---     if not view then
---         ngx.log(ngx.ERR, "route view is not found: "..route.path.."/"..(route.name or "")..", viewSrc: "..viewSrc)
---         return viewSrc
---     end
-
---     local status
---     content, status = view:render(context)
---     if not content or status < 200 or status >= 400 then
---         ngx.log(ngx.ERR, "Cannot render view "..viewSrc)
---         return viewSrc
---     end
---     -- not neccessary to save file at this time?: route:saveToFile(content, context)
-
---     return content
--- end
-
-local ngx = ngx
-
 local _view = setmetatable({}, 
     {
         -- __index = function(self, key)
@@ -77,39 +48,57 @@ local _view = setmetatable({},
     }
 )
 
-local function newView(viewInfo, fullName)
-    ngx.log(ngx.DEBUG, "ViewInfo: "..utils.toJson(viewInfo))
+local function newView(viewName, package)
+    local fullName = package.."."..viewName
+    local viewInfo = require(fullName)
+    if not viewInfo or type(viewInfo) ~= "table" then
+        return nil, "ViewInfo '"..fullName.."' is not found or invalid"
+    end
+    utils.logDebug("ViewInfo: "..utils.toJson(viewInfo))
     local view = setmetatable(viewInfo or {}, {__index = _view})
+    view.tblRegistry = {} --> table registry for this view class
+
     view.name = fullName
 
-    local tableDef = viewInfo.tableDef 
+    view.table = viewInfo.tableDef 
                     or (viewInfo.tableName and eifo.db.table[viewInfo.tableName])
-    view.table = tableDef and tableDef:new({
-        toJsonColumns = viewInfo.toJsonColumns,
-    })
+    local tblNames = viewInfo.tableNames
+    if tblNames and #tblNames > 0 then
+        local tbls = {}
+        for _, tblName in pairs(tblNames) do
+            tbls[#tbls+1] = eifo.db.table[tblName]
+        end
+        view.tables = tbls
+    end
     local layoutType = type(view.layout)
     if layoutType == "string" then
         view.layoutUri = view.layout
         view.layout = nil
     end
-    view.requireKey = not view.key and not view.record
-    view.outputFile = view.outputFile and (view.key or view.requireKey)
-    view.cacheTemplate = not view.outputFile or view.requireKey
+    view._search = viewInfo._search or string.sub(viewName, 1, 6) == 'search'
+    view.requireKey = not (view._search or view.key or view.record)
+    view.outputFile = view.outputFile and (not view._search) and (view.key or view.requireKey)
+    view.cacheTemplate = view._search or view.requireKey or not view.outputFile 
     return view
 end
 
-_view.loadView = function(fullName, templatePath)
-    local viewInfo = require(fullName)
-    if not viewInfo or type(viewInfo) ~= "table" then
-        return nil
+_view.loadView = function(uri, templatePath)
+    local paths = eifo.utils.splitStr(uri, "/")
+    local viewName = paths[#paths]
+    local package = "view."..table.concat(paths, ".", 1, #paths - 1)
+    local view, viewErr = newView(viewName, package)
+    if not view then
+        utils.logError("Cannot create view "..uri..": "..viewErr)
+        return nil, paths
     end
 
-    local view = newView(viewInfo, fullName)
     if not templatePath then
-        return view
+        return view, paths
     end
+    local _, _ , fileExt = string.find(templatePath, "%.view%.(%a+)$")
+    view.fileExt = fileExt and string.lower(fileExt) or "html"
     view.templatePath = templatePath
-    return view
+    return view, paths --> avoid coupling view with paths so that the same view object can be used with many paths
 end
 function _view:createTemplateFunction()
     local templatePath = self.templatePath
@@ -164,47 +153,72 @@ end
 function _view:createLayoutPathParam(context)
     return ""
 end
-function _view:loadRecord(context)
+function _view:newTable(tableClass)
+    return tableClass:new({conn = ngx.ctx.conn, toJsonColumns = self.toJsonColumns, tblRegistry = self.tblRegistry})
+end
+function _view:loadByKey(context)
+    if context.record then
+        return
+    end
     if self.record then
-        return self.record
+        context.record = self.record
+        return
     end
     local key = self:getKey(context)
-    if not key then
-        return nil, (self.name or "root")..": Cannot generate key. No search params"
-    end
-    if not self.table then
-        return nil, (self.name or "root")..": Cannot generate key. No table defined in view"
+    if not key or not self.table then
+        return
     end
 
-    local model = self.table:new({conn = context.conn})
+    local model = self:newTable(self.table)
     --ngx.log(ngx.DEBUG, (self.name or "root")..": Loading key "..key)
     local record, err = model:loadByKey(key)
-    return record, err, key
+    if err then
+        ngx.log(ngx.ERR, "ERR: "..(self.name or "root")..": Cannot load key "..key..", err: "..err)
+        return
+    end
+    context.record = record
+end
+function _view:load1TblByKeywords(tbl, context)
+    local keywords = context.params or self.keywords or {}
+
+    local model = self:newTable(tbl)
+    local records, err = model:loadByKeywords(keywords)
+    if err then
+        ngx.log(ngx.ERR, "ERR: "..(self.name or "root")..": Cannot load keywords "..utils.toJson(keywords)..", err: "..err)
+        return
+    end
+    if context.records then
+        local cRecords = context.records
+        for i = 1, #records, 1 do
+            cRecords[#cRecords+1] = records[i]
+        end
+    else
+        context.records = records
+    end
+end
+function _view:loadByKeywords(context)
+    if self.table then
+        self:load1TblByKeywords(self.table, context)
+    end
+    if self.tables then
+        for _, tbl in pairs(self.tables) do
+            local tableDef = tbl.tableDef or (tbl.tableName and eifo.db.table[tbl.tableName])
+            if tableDef then
+                self:load1TblByKeywords(tableDef, context)
+            end
+        end
+    end
 end
 function _view:render(context)
     ngx.log(ngx.DEBUG, "Rendering view "..self.name)
-    local err, recordKey, shouldDisconnect
-    local record, conn = context.record, context.conn
-    if not conn then
-        conn, err = utils.getDbConnection()
-        context.conn = conn
-        if not conn then
-            ngx.log(ngx.ERR, (self.name or "root")..": Cannot get connection, "..(err or ""))
-            return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
-        end
-        conn:connect()
-        shouldDisconnect = true
+    if self._search and not context.records then
+        self:loadByKeywords(context) --> load records by keywords
+    elseif not context.record then
+        self:loadByKey(context) --> load record by key
     end
-    if not record then
-        record, err, recordKey = self:loadRecord(context)
-        if not record then
-            ngx.log(ngx.INFO, "ERR_NOT_FOUND: "..err..(recordKey and ", key: "..recordKey or ""))
-            if shouldDisconnect then
-                conn:disconnect()
-            end
-            return nil, ngx.HTTP_NOT_FOUND
-        end
-        context.record = record
+    if not context.record and not context.records then
+        ngx.log(ngx.INFO, "No record found for view: "..self.name)
+        return nil, ngx.HTTP_NOT_FOUND
     end
 
     local pageContext = self:createPageContext(context)
@@ -216,7 +230,6 @@ function _view:render(context)
         sHtml = layoutFunc(pageContext)
     end
 
-    conn:disconnect()
     return sHtml, ngx.HTTP_OK
 end
 return _view

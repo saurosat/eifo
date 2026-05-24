@@ -25,18 +25,17 @@ end
 function record:getChildren()
     local children = self:getMetaValue("children", true) 
     if children then
-        ngx.log(ngx.DEBUG, self.key.."'s children: "..utils.toJson(children))
         return children
     end
     local tbl = self._table
     if not tbl then
-        ngx.log(ngx.ERR, self.className.." record "..utils.toJson(self).." has no associated table")
+        utils.logError(self.className.." record "..utils.toJson(self).." has no associated table")
         return {}
     end
     children = utils.ArraySet:new()
     local rollups = self.childRollups or {}
     if #rollups == 0 then
-        ngx.log(ngx.DEBUG, self.key.." childRollups is empty")
+        utils.logDebug(self.key.." childRollups is empty")
     end
     for i = #rollups, 1, -1 do
         local rollup = rollups[i]
@@ -48,12 +47,12 @@ function record:getChildren()
             children:add(child)
         end
     end
-    ngx.log(ngx.DEBUG, self.key.."'s children loaded: "..utils.toJson(children))
+    --utils.logDebug(self.key.."'s children loaded: "..utils.toJson(children))
     self:setMetaValue("children", children)
     return children
 end
 function record:getProducts (catType)
-    --ngx.log(ngx.DEBUG, "catType = "..(catType or "nil"))
+    --utils.logDebug("catType = "..(catType or "nil"))
     local products = {}
     local catMems = self.catMems
     if catMems then
@@ -61,7 +60,7 @@ function record:getProducts (catType)
             products[#products + 1] = catMems[i].product
         end
     else
-        ngx.log(ngx.DEBUG, self.key..": No catMems found")
+        --utils.logDebug(self.key..": No catMems found")
     end
     local directOnly = not catType
     if not directOnly then
@@ -76,7 +75,7 @@ function record:getProducts (catType)
             end
         end
     end
-    ngx.log(ngx.DEBUG, "Numbers of products: " ..#products.."cat:getProducts, catMems: "..(catMems and tostring(#catMems) or "nil"))
+    --utils.logDebug("Numbers of products: " ..#products.."cat:getProducts, catMems: "..(catMems and tostring(#catMems) or "nil"))
     return products
 end
 function record:getTreeDisplayStrs(catArray, subCatFilter, tab, space, bullet, hJoint, vJoint)

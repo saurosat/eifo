@@ -8,6 +8,7 @@
 home/js/Archive.zip
 home/js/test.html
 home/js/test.jj
+home/tailwind-execs
 logs/access.log
 logs/error.log
 lua/eifo/.idea/.gitignore
@@ -152,3 +153,12 @@ home/img/*/*.gif
 __*.*
 *.bak
 home/layout/*.html
+cert/myCA.key
+cert/myCA.pem
+dump.rdb
+dump.rdb
+dump.rdb
+home/css/gleecy.bak.css
+logs/nginx.pid
+.gitignore
+home/evan.html

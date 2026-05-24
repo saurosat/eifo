@@ -4,18 +4,43 @@
 --- DateTime: 10/11/23 7:55 AM
 ---
 local utils = eifo.utils
-ngx.log(ngx.INFO, "URI: ____"..ngx.var.request_uri.."_____")
-local route, context = eifo.route:getRoute(ngx.var.request_uri)
-local content, err, status
+local ngx = ngx
+
+ngx.log(ngx.INFO, "URI: ____"..ngx.var.uri.."_____")
+
+local readReqData = require "resty.reqargs"
+local getData, postData, _ = readReqData()
+utils.mergeRef(ngx.ctx, postData)
+utils.mergeRef(ngx.ctx, getData)
+
+local route, context = eifo.route:getRoute(ngx.var.uri)
+local content, error, status
 local view = route.view
-if not view then
-    content, err = route:loadFromFile(context)
-    status = content and ngx.HTTP_OK or ngx.HTTP_NOT_FOUND
-else
+if view then
+    local shouldDisconnect = false
+    if not ngx.ctx.conn then
+        local conn, err = eifo.db.conn.redis()
+        if not conn then
+            ngx.log(ngx.ERR, "Cannot get connection, "..(err or ""))
+            return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
+        end
+        conn:connect()
+        ngx.ctx.conn = conn
+        shouldDisconnect = true
+    end
+
     content, status = view:render(context)
+
+    if shouldDisconnect then
+        ngx.ctx.conn:disconnect()
+        ngx.ctx.conn = nil
+    end
+else
+    content, error = route:loadFromFile(context)
+    status = content and ngx.HTTP_OK or ngx.HTTP_NOT_FOUND
 end
 if not content then
-    utils.responseError(status, "Error") --> TODO: localize messages
+    utils.responseError(status, "Error "..(error or " unknown")) --> TODO: localize messages
     return
 end
 

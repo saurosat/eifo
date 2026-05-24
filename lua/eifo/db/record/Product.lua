@@ -32,74 +32,55 @@ function record:getImageUrls(size)
     imageUrls[size] = urls
     return urls
 end
-function record:getImages(featureAbbrevs)
+
+function record:getImages()
     local pseudoId = self.pseudoId
     if not pseudoId then
-        ngx.log(ngx.ALERT, "pseudoId is NIL in record "..self._table._name..".key = "..self.key)
+        utils.logWarn("pseudoId is NIL in record "..self._table._name..".key = "..self.key)
         return {}
     end
-    local fStartIndex = pseudoId:len() + 2
     local images = self:getMetaValue("images", true)
-    if not images then
-        images = {}
-        self:setMetaValue("images", images)
-        local fileNames = eifo.store:getProductImageFileNames(pseudoId)
-        if not fileNames or #fileNames == 0 then
-            ngx.log(ngx.DEBUG, pseudoId.." has no image files")
-            return images
-        end
-        local num = #fileNames
-        for i = 1, num, 1 do
-            ngx.log(ngx.DEBUG, "Image file "..fileNames[i])
-            local nameParts = utils.newArray(4)
-            for part in fileNames[i]:gmatch("([^/%.]+)") do
-                nameParts[#nameParts+1] = part
-            end
-            local numParts = #nameParts
-            local fPseudoId = nameParts[1]
-            local sFeatures = fPseudoId:sub(fStartIndex, -1)
-            local fileName = nameParts[2].."."..nameParts[numParts]
-            assert(fileName and string.len(fileName) > 4, "invalid image fileName: "..fileNames[i])
-            local image = images[fileName]
+    if images then
+        return images
+    end
+
+    images = {}
+    self:setMetaValue("images", images)
+    local fileNames = eifo.store:getProductImageFileNames(pseudoId)
+    if not fileNames or #fileNames == 0 then
+        utils.logDebug(pseudoId.." has no image files")
+        return images
+    end
+    local num = #fileNames
+    for i = 1, num, 1 do
+        local fileName = fileNames[i]
+        utils.logDebug("Image file "..fileName)
+        local fPseudoId, ori, ext, sig, size, sFeature = eifo.store:extractImgInfo(fileName)
+        if not ori or not ext then
+            utils.logWarn("Invalid image fileName: "..fileName)
+        else
+            local oriFileName = ori..(sFeature and ("."..sFeature) or "").."."..ext
+            local image = images[oriFileName]
             if not image then
-                image = self:newImageObj("/"..fPseudoId.."/"..fileName)
-                if sFeatures:len() > 0 then
+                image = self:newImageObj("/"..fPseudoId.."/"..oriFileName)
+                if sFeature and sFeature:len() > 0 then
                     local abbrevs = {}
-                    for abbrev in string.gmatch(sFeatures, "[^_]+") do
-                        --ngx.log(ngx.DEBUG, "fPseudoId = "..fPseudoId..", abbrev = "..abbrev)
+                    for abbrev in string.gmatch(sFeature, "[^_]+") do
+                        --utils.logDebug("fPseudoId = "..fPseudoId..", abbrev = "..abbrev)
                         abbrevs[#abbrevs+1] = abbrev
                     end
                     image.features = abbrevs
                 end
-                images[fileName] = image
+                images[oriFileName] = image
             end
-            if numParts == 5 then
-                local signature, size = nameParts[3], nameParts[4]
-                image[size] = "/"..fPseudoId.."."..signature.."."..size.."."..fileName
+            -- cache uri for size
+            if sig and size then
+                image[size] = "/"..fPseudoId.."."..sig.."."..size.."."..oriFileName
             else
-                image["0x0"] = "/"..fPseudoId.."."..fileName
-            end
-            --ngx.log(ngx.DEBUG, "/"..fPseudoId.."/"..fileName)
-        end
-    end
-    if not featureAbbrevs or #featureAbbrevs == 0 then
-        return images
-    end
-    for i = 1, #featureAbbrevs, 1 do
-        local featureAbbrev = featureAbbrevs[i]
-        local matchedImgs = {}
-        for fileName, image in pairs(images) do
-            local imgAbbrevs = image.features
-            for k = 1, #imgAbbrevs, 1 do
-                if imgAbbrevs[k] == featureAbbrev then
-                    matchedImgs[fileName] = image
-                    break
-                end
+                image["0x0"] = "/"..fPseudoId.."."..oriFileName
             end
         end
-        if next(matchedImgs) then --> if matchedImgs is empty_array, this abbrev is considered as not applicable for images
-            images = matchedImgs
-        end
+        --utils.logDebug("/"..fPseudoId.."/"..fileName)
     end
 
     return images
@@ -116,7 +97,7 @@ function record:getSelectableFeatures()
     self:setMetaValue("selectableFeatures", features)
     local featureAppls = self.featureAppls
     if not featureAppls then
-        ngx.log(ngx.DEBUG, "No featureAppls")
+        utils.logDebug("No featureAppls")
         return features
     end
     for i = 1, #featureAppls, 1 do
@@ -149,7 +130,7 @@ function record:getVirtualProduct()
     end
     local assocs = self.fromAssocs
     if not assocs or #assocs == 0 then
-        ngx.log(ngx.DEBUG, "Not found assocs for product "..self.key)
+        utils.logDebug("Not found assocs for product "..self.key)
         return nil
     end
     local virtualProduct = nil
@@ -167,9 +148,9 @@ function record:getVirtualProduct()
     return virtualProduct
 end
 function record:getVariants()
-    --ngx.log(ngx.DEBUG, "product:getVariants "..self.productTypeEnumId)
+    --utils.logDebug("product:getVariants "..self.productTypeEnumId)
     if self.productTypeEnumId ~= "e.PtVirtual" then
-        ngx.log(ngx.DEBUG, "NOT a e.PtVirtual type: "..self.productTypeEnumId)
+        utils.logDebug("NOT a e.PtVirtual type: "..self.productTypeEnumId)
         return nil
     end
     if self:getMetaValue("variants") then
@@ -179,15 +160,15 @@ function record:getVariants()
     self:setMetaValue("variants", variants)
     local features = self:getSelectableFeatures()
     if not features or not next(features) then
-        ngx.log(ngx.DEBUG, "Not found selectableFeatures for product "..self.key)
+        utils.logDebug("Not found selectableFeatures for product "..self.key)
         return nil
     end
-    for k, _ in pairs(features) do
-        ngx.log(ngx.DEBUG, utils.toJson(k))
-    end
+    -- for k, _ in pairs(features) do
+    --     utils.logDebug(utils.toJson(k))
+    -- end
     local assocs = self.assocs
     if not assocs then
-        ngx.log(ngx.DEBUG, "Not found assocs for product "..self.key)
+        utils.logDebug("Not found assocs for product "..self.key)
         return nil
     end
     local maxIndex = 0
@@ -203,14 +184,14 @@ function record:getVariants()
                     index = index + sFeature[0] + sFeature:index(v)
                 end
                 variants[index] = variant
-                ngx.log(ngx.DEBUG, "index = "..tostring(index))
+                --utils.logDebug("index = "..tostring(index))
                 if maxIndex < index then
                     maxIndex = index
                 end                
             end
         end
     end
-    ngx.log(ngx.DEBUG, "maxIndex = "..tostring(maxIndex))
+    --utils.logDebug("maxIndex = "..tostring(maxIndex))
     for i = 1, maxIndex, 1 do
         if not variants[i] then
             variants[i] = false
@@ -220,7 +201,7 @@ function record:getVariants()
 end
 function record:getDistinguishFeatures()
     if self.productTypeEnumId ~= "e.PtAsset" then
-        ngx.log(ngx.DEBUG, "NOT a e.PtAsset type: "..self.productTypeEnumId)
+        utils.logDebug("NOT a e.PtAsset type: "..self.productTypeEnumId)
         return nil
     end
     if self:getMetaValue("distinguishFeatures") then
@@ -231,12 +212,12 @@ function record:getDistinguishFeatures()
     self:setMetaValue("distinguishFeatures", features)
     local featureAppls = self.featureAppls
     if not featureAppls then
-        ngx.log(ngx.DEBUG, "No featureAppls")
+        utils.logDebug("No featureAppls")
         return features
     end
     for i = 1, #featureAppls, 1 do
         local featureAppl = featureAppls[i]
-        ngx.log(ngx.DEBUG, "featureAppls type = "..featureAppl.applTypeEnumId)
+        utils.logDebug("featureAppls type = "..featureAppl.applTypeEnumId)
         if featureAppl.applTypeEnumId == "e.PfatDistinguishing" then
             local feature = featureAppl.productFeature
             local fType = feature.productFeatureTypeEnum
@@ -269,7 +250,7 @@ function record:toJson(columns)
         json = json..'"'..key..'": '..utils.toJson(value, refs)..", "
     end
     columns = columns or self._table.toJsonColumns
-    ngx.log(ngx.DEBUG, "columns = "..(columns and table.concat(columns, ", ") or "null"))
+    --utils.logDebug("columns = "..(columns and table.concat(columns, ", ") or "null"))
     if columns then
         for i = 1, #columns, 1 do
             local colName = columns[i]
@@ -310,29 +291,13 @@ function record:toJson(columns)
                 local variants = self:getVariants()
                 if variants and #variants > 0 then
                     json = json..'"maskVariants": [null, '
-                    for i = 1, #variants, 1 do
-                        json = json..(variants[i] and variants[i]:toJson(columns) or "null")..", "
+                    for j = 1, #variants, 1 do
+                        json = json..(variants[j] and variants[j]:toJson(columns) or "null")..", "
                     end
                     json = json:sub(1, -3).."], "
                 end
             elseif colName:sub(1, 13) == "productImages" then
-                local virtual = self
-                local abbrevs = nil
-                if self.productTypeEnumId ~= "e.PtVirtual" then
-                    virtual = self:getVirtualProduct()
-                    -- if virtual then
-                    --     ngx.log(ngx.DEBUG, "virtualProduct of asset "..self.productId.." is "..virtual.productId)
-                    -- end
-                    local features = self:getDistinguishFeatures()
-                    if features then
-                        abbrevs = {}
-                        for _, feature in pairs(features) do
-                            abbrevs[#abbrevs+1] = feature.abbrev
-                        end
-                        --ngx.log(ngx.DEBUG, "Features of "..self.productId.." is "..table.concat(abbrevs, ", "))
-                    end
-                end
-                local images = virtual and virtual:getImages(abbrevs) or nil;
+                local images = self:getImages();
                 if images then
                     local sSizes = colName:sub(14, -1)
                     local sizes = {}

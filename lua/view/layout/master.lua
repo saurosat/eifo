@@ -26,10 +26,45 @@ local function buildCatMenuData(categories)
     end
     return topCats
 end
+local function buildCatTree(categories)
+    local topCats = {}
+    local catMap = {}
+    for i = 1, #categories, 1 do
+        local cat = categories[i]
+
+        local seq = cat.sequenceNum
+        if seq then
+            if seq < 100 then
+                topCats[#topCats + 1] = cat
+            end
+
+            local catSeq = seq % 100
+            if catMap[catSeq] then
+                cat.items = catMap[catSeq].items
+                catMap[catSeq] = cat
+            else
+                cat.items = {}
+            end
+
+            local parentSeq = math.floor(seq/100)
+            while parentSeq > 0 do
+                catSeq = parentSeq % 100
+                if catMap[catSeq] then
+                    local items = catMap[catSeq].items
+                    items[#items + 1] = cat
+                else
+                    catMap[catSeq] = {items = {cat}}
+                end
+                parentSeq = math.floor(parentSeq/100)
+            end
+        end
+    end
+end
+
 return {
     tableName = "ProductStore",
     key = eifo.storeId,
-    outputFile = false,
+    outputFile = true,
     createPageContext = function (self, context)
         local record = context.record
         local categories = record.categories
@@ -48,24 +83,25 @@ return {
         -- end
         local store = eifo.store
         return {
+            main = "{* main *}",
             token = store:getSessionToken(),
             storeId = store.productStoreId,
             currencyUomId = store.defaultCurrencyUomId or "undefined",
+            lang = 'EN',
             --catTreeArray = catTreeArray,
             mainMenuItems = {
                 {key = "mmiLang", title = "EN", svgId = "dropdown", 
                     items = {
-                        {key = "EN", title = "EN", href = "#"}, 
-                        {key = "VI", title = "VI", href = "#"}, 
-                        {key = "CN", title = "CN", href = "#"}
+                        {key = "EN", title = "EN", href = ".?lang=en"}, 
+                        {key = "VI", title = "VI", href = ".?lang=vi"}, 
+                        {key = "CN", title = "CN", href = ".?lang=cn"}
                     }},
                 {key = "mmiSignIn", title = "Sign In", userAccount = "window.userAccount", forLoggedIn = false, event = "open-login"},
                 {key = "mmiCart", title = "Cart", userAccount = "window.userAccount", forLoggedIn = true, event = "open-cart"},
                 {key = "mmiOrders", title = "Orders", userAccount = "window.userAccount", forLoggedIn = true, event = "open-orders"},
                 {key = "mmiReturns", title = "Returns", userAccount = "window.userAccount", forLoggedIn = true, event = "open-returns"},
             },
-            catMenuItems = buildCatMenuData(categories),
-            lang = 'EN'
+            catMenuItems = buildCatMenuData(categories)
         }
     end
 }

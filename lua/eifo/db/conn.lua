@@ -4,6 +4,7 @@
 --- DateTime: 9/17/23 9:42 AM
 ---
 local utils = eifo.utils
+local ngx = ngx
 
 local rwmt = utils.newTable(0, 18)
 rwmt.connect = function(self)
@@ -87,29 +88,38 @@ rwmt.hset = function(self, key, hashValue, autocommit)
     local newVals
     local newVersion = 1
     --ngx.log(ngx.DEBUG, "OldVals: \n"..utils.toString(oldVals, ": ", "\n"))
-    local newFields = {} -- keeps fields that is currently empty
+    local newFields -- keeps fields that is currently empty
     local delFields = {} -- Fields to be deleted
     if not oldVals or utils.isTableEmpty(oldVals) then
         hashValue["version"] = 1
         newVals = hashValue
+        for key, value in pairs(newVals) do
+            if value == "_NA_" then
+                newVals[key] = nil
+            end
+        end
+        newFields = fields
     else
         newVersion = (oldVals["version"] or 1) + 1 -- default 1 for backward compatibility
         newVals = utils.newTable(0, #fields) -- malloc for a table with size = #fields
+        newFields = utils.newTable(0, #fields)
         for i = #fields, 1, -1 do
             local k = fields[i]
             local v = hashValue[k]
-            if not oldVals[k] then
-                newFields[#newFields] = k
-                newVals[k] = v
-            elseif oldVals[k] ~= v then -- different:
-                if v == "_NA_" then
+            if v == "_NA_" then
+                if oldVals[k] then
                     delFields[#delFields+1] = k
-                else
-                    newVals[k] = v
                 end
-            else -- if equal :
-                oldVals[k] = nil -- remove from oldVals
-                table.remove(fields, i) -- remove from fields
+            else
+                if not oldVals[k] then
+                    newFields[#newFields] = k
+                    newVals[k] = v
+                elseif oldVals[k] ~= v then -- different:
+                    newVals[k] = v
+                else -- if equal :
+                    oldVals[k] = nil -- remove from oldVals
+                    table.remove(fields, i) -- remove from fields
+                end
             end
         end
         if not utils.isTableEmpty(newVals) then
@@ -121,25 +131,29 @@ rwmt.hset = function(self, key, hashValue, autocommit)
     if #fields == 0 then
         return {} -- no differences found. Ignored update
     end
-    --ngx.log(ngx.DEBUG, "hmset params: "..utils.toString(newVals, ": ", "\n"))
+    local isDirty = false
     local ok, err
     if #delFields > 0 then
         ok, err = self.connection:hdel(key, table.unpack(delFields))
         if not ok then
             return nil, err
         end
+        isDirty = true
     end
-    ok, err = self.connection:hmset(key, newVals)
-    if not ok then
-        return nil, err
-    end
-    if not autocommit then
-        if not oldVals or utils.isTableEmpty(oldVals) then
-            self._rollback:push({f = rwmt.hdel, params = {self, key, fields, true}})
-        else
-            self._rollback:push({f = rwmt.hset, params = {self, key, oldVals, true}})
+    --ngx.log(ngx.DEBUG, "hmset params: "..utils.toString(newVals, ": ", "\n"))
+    if not utils.isTableEmpty(newVals) then
+        ok, err = self.connection:hmset(key, newVals)
+        if not ok then
+            return nil, err
+        end
+        isDirty = true
+
+        if not autocommit then
             self._rollback:push({f = rwmt.hdel, params = {self, key, newFields, true}})
         end
+    end
+    if (not autocommit) and isDirty and (not utils.isTableEmpty(oldVals)) then
+        self._rollback:push({f = rwmt.hset, params = {self, key, oldVals, true}})
     end
     return oldVals, nil, newVals
 end
@@ -239,16 +253,25 @@ end
 rwmt.sismember = function(self, key, item)
     return self.connection:sismember(key, item)
 end
-setmetatable(rwmt, {__index = function(self, cmdName)  
-    local cmd = function(self, ...)
-        return self.connection[cmdName](self, ...)
-    end
-    rwmt[cmdName] = cmd
-    return cmd
+rwmt.ftlist = function (self)
+    return self.connection:ft():list()
+end
+rwmt.ftsearch = function (self, ...)
+    return self.connection:ft():search(...)
+end
+rwmt.ftcreate = function (self, ...)
+    return self.connection:ft():create(...)
+end
+local function errNotSupported()
+    local err = "Method not supported by this connection type"
+    ngx.log(ngx.ERR, err)
+    return nil
+end
+setmetatable(rwmt, {__index = function(self, cmdName)
+    local conn = rawget(self, "connection")
+    local connType = type(conn)
+    return connType == "table" and conn[cmdName] or connType == "function" and conn(self, cmdName) or errNotSupported()
 end})
-local RW = {
-    __index = rwmt
-}
 
 local redisAgent = require "resty.redis"
 
@@ -268,6 +291,7 @@ local connFactory = {
             local errMsg = "Can not initialized DB connection "+ ": " + (err or "Unknown error")
             error(errMsg, ngx.ERR)
         end
+        connection.register_module_prefix("ft")
         connection:set_timeouts(timeout)
         local dbconn = {
             _host = host,
@@ -277,7 +301,7 @@ local connFactory = {
             _rollback = utils.lifo(),
             connection = connection
         }
-        setmetatable(dbconn, RW)
+        setmetatable(dbconn, {__index = rwmt})
         return dbconn
     end
 }

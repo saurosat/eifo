@@ -14,11 +14,14 @@ function Route:new(routeInfo)
     routeInfo = routeInfo or {}
     routeInfo.pos = routeInfo.pos or 0
     routeInfo.path = routeInfo.path or "/" --> must start and end with "/"
-    if string.sub(routeInfo.path, 1, 1) ~= "/" then
-        routeInfo.path = "/"..routeInfo.path
-    end
-    if string.sub(routeInfo.path, -1, -1) ~= "/" then
-        routeInfo.path = routeInfo.path.."/"
+    --ngx.log(ngx.DEBUG, "Route path init: "..routeInfo.path)
+    if string.len(routeInfo.path) > 1 then
+        if string.sub(routeInfo.path, 1, 1) ~= "/" then
+            routeInfo.path = "/"..routeInfo.path
+        end
+        if string.sub(routeInfo.path, -1, -1) ~= "/" then
+            routeInfo.path = routeInfo.path.."/"
+        end
     end
     return setmetatable(routeInfo, {__index = self})
 end
@@ -39,43 +42,42 @@ function Route:getRoute(uriStr, context)
     if pathParams[1] == "api" then
         table.remove(pathParams, 1)
     end
-    if pathParams[#pathParams] == "_EN_"  then
-        ngx.ctx.lang = "en"
-        pathParams[#pathParams] = nil
-    elseif pathParams[#pathParams] == "_VI_" then
-        ngx.ctx.lang = "vi"
-        pathParams[#pathParams] = nil
-    elseif pathParams[#pathParams] == "_CN_" then
-        ngx.ctx.lang = "cn"
-        pathParams[#pathParams] = nil
-    else
-        ngx.ctx.lang = ngx.ctx.lang or "en" --> default language
-    end
+    -- if pathParams[#pathParams] == "_EN_"  then
+    --     ngx.ctx.lang = "en"
+    --     pathParams[#pathParams] = nil
+    -- elseif pathParams[#pathParams] == "_VI_" then
+    --     ngx.ctx.lang = "vi"
+    --     pathParams[#pathParams] = nil
+    -- elseif pathParams[#pathParams] == "_CN_" then
+    --     ngx.ctx.lang = "cn"
+    --     pathParams[#pathParams] = nil
+    -- else
+    --     ngx.ctx.lang = ngx.ctx.lang or "en" --> default language
+    -- end
     local pathPrefix = fileExt and eifo.pathPrefixes[fileExt]
     if pathPrefix and pathParams[1] ~= pathPrefix  then
         table.insert(pathParams, 1, pathPrefix)
     end
 
     local node = self
-    for i = self.pos + 1, #pathParams, 1 do
-        if not node[pathParams[i]] then
+    local pos, pathSize = node.pos + 1, #pathParams
+    while pos <= pathSize do
+        local dirName = pathParams[pos]
+        if not node[dirName] then
+            if dirName == "no_layout" then  -- path param "no_layout" must be right after the sub route
+                context.noLayout = "no_layout"
+                pos = pos + 1 -- skip this param
+            end
             break
         end
-        node = node[pathParams[i]]
+        node = node[dirName]
+        pos = pos + 1
     end
-    if node.pos == #pathParams and not node.view and node["index"] then --> index page
+    if not node.view and node["index"] then
         node = node["index"]
     end
-    local pos = node.pos + 1
 
-    local noLayout
-    if pathParams[pos] == "no_layout" then
-        pos = pos + 1
-        noLayout = "no_layout"
-    end
-    context.noLayout = noLayout
-
-    local params = {table.unpack(pathParams, pos)}    
+    local params = {table.unpack(pathParams, pos)}
     if #params > 0 then
         context.params = params
         local view = node.view
@@ -87,8 +89,8 @@ function Route:getRoute(uriStr, context)
     return node, context
 end
 
-function Route:addView(paths, view, fileExt)
-    local route = self
+function Route:addView(paths, view)
+    local fileExt = view.fileExt
     local pathPrefix = fileExt and eifo.pathPrefixes[fileExt]
     if pathPrefix and paths[1] ~= pathPrefix then
         table.insert(paths, 1, pathPrefix)
@@ -96,13 +98,44 @@ function Route:addView(paths, view, fileExt)
     ngx.log(ngx.DEBUG, utils.toJson(paths), pathPrefix or " no prefix")
 
     local numDirs = #paths - 1
+    local err = nil
+    local route = self
     for i = 1, numDirs, 1 do
-        route = route:addRoute(paths[i], {outputFile = view.outputFile})
+        route, err = route:addDir(paths[i], view.outputFile)
+        if err then
+            break
+        end
+    end
+    if err then
+        error(err, 2)
     end
     route = route:addRoute(paths[#paths], view)
     if fileExt then
         route.fileExt = fileExt
     end
+end
+
+function Route:addDir(subName, makeDir)
+    local subPath = self.name and self.path..self.name.."/" or self.path
+
+    if makeDir then
+        local dir = subPath..subName
+        local ok, err = utils.mkdir(self.basePath..dir)
+        if not ok then
+            err = "Cannot create directory for route: "..dir..", error: "..err
+            --ngx.log(ngx.ERR, err)
+            return self, err
+        end
+    end
+
+    local routeKey = subName
+    local route = self[routeKey]
+    if not route then
+        route = Route:new({name = subName, path = subPath, pos = self.pos + 1, basePath = self.basePath})
+        self[routeKey] = route
+    end
+
+    return route
 end
 
 function Route:addRoute(subName, subView)
@@ -111,16 +144,18 @@ function Route:addRoute(subName, subView)
 
     local routeKey = subName
     if subView.outputFile and subView.requireKey then
-        local dir = subPath.."/"..subName
-        local dirExist, _, code = os.rename(dir, dir) --> check if location exists:
-        if not dirExist and code ~= 13 then --> if not, create the dir
-            os.execute("mkdir "..dir) --> make dir for any non-view route having child view routea
-            if subView.name then --> real view, not emptyView
-                os.execute("mkdir "..dir.."/no_layout")
-                subPath = dir.."/"
-                subName = nil
-            end
+        local dir = subPath..subName
+        local ok, err = utils.mkdir(self.basePath..dir)
+        if ok then
+            ok, err = utils.mkdir(self.basePath..dir.."/no_layout")
         end
+        if not ok then
+            err = "Cannot create directory for route: "..dir..", error: "..err
+            ngx.log(ngx.ERR, err)
+            return self, err
+        end
+        subPath = dir.."/"
+        subName = nil
     end
     local route = self[routeKey]
     if route then
@@ -175,7 +210,7 @@ function Route:getFilePath(context)
             return nil
         end
         if view.requireKey then
-            local key = view:getKey()
+            local key = view:getKey(context)
             if not key then
                 return nil, "Not enough params to generate key for view '"..view.name.."', params: "..utils.toJson(params)
             end
@@ -198,20 +233,40 @@ function Route:getFilePath(context)
         params[num + 1] = params[num]
         params[num] = "no_layout"
     end
-    local filePath = (self.basePath or "")..self.path..table.concat(params, "/").."."..self:getFileExt()
+    context.fileExt = self:getFileExt()
+    context.fileName = params[#params]
+    params[#params] = nil
+    local relPath = #params > 0 and (table.concat(params, "/").."/") or ""
+    local filePath = (self.basePath or "")..self.path..relPath
     context.filePath = filePath
-    return filePath
+    return filePath..context.fileName.."_"..ngx.var.lang.."."..self:getFileExt()
 end
 function Route:loadFromFile(context)
-    local filePath, err = self:getFilePath(context)
+    local filePath = context.filePath
+    local retry
     if not filePath then
-        return nil, err
+        local err
+        filePath, err = self:getFilePath(context)
+        if not filePath then
+            return nil, err
+        end
+        retry = context.filePath and true or false
+    else
+        filePath  = filePath..context.fileName
+        if context.lang then
+            filePath = filePath.."_"..context.lang
+        end
+        filePath = filePath.."."..self:getFileExt()
+        retry = false
     end
     local content, fileErr = utils.read_file(filePath)
-    if not content then
-        ngx.log(ngx.DEBUG, "Cannot read file "..filePath..": "..(fileErr or "Unknown reason"))
+    ngx.log(ngx.DEBUG, "Load File "..filePath..": "..(content and "success" or fileErr or " not found"))
+    if not content and retry then
+        ngx.log(ngx.DEBUG, "Retry load file without lang")
+        context.lang = nil
+        return self:loadFromFile(context) --> try again without lang
     end
-    return content, fileErr
+    return content
 end
 function Route:saveToFile(renderedText, context)
     if not self.view or not self.view.outputFile then

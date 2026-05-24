@@ -3,83 +3,111 @@
 --- Created by tnguyen.
 --- DateTime: 9/2/23 12:06 PM
 ---
+local ngx = ngx
 local utils = eifo.utils
+
+local cjson = require "cjson"
+local function response(resData, httpStatus)
+    ngx.header["Content-Type"] = "application/json"
+    ngx.status = ngx.HTTP_OK
+    ngx.say(cjson.encode(resData))    
+    ngx.eof()
+end
+
+local tables = {};
+local function updateRecord(reqData, conn)
+    local entityName = utils.popKey(reqData, "entityName")
+    if not entityName then
+        return {status="failed", message="Entity Name (key 'entityName') is missing"}
+    end
+    local action = utils.popKey(reqData, "action")
+
+    local tbl = tables[entityName]
+    if not tbl then
+        tbl = eifo.db.table[entityName]
+        if not tbl then
+            return {status="failed", message="Entity '" .. entityName .."' has no definition"}
+        end
+        tbl = tbl:new({conn = conn})
+        tables[entityName] = tbl
+    end
+    local record, err = tbl:newRecord(reqData)
+    if not record then
+        return {status="failed", message="Cannot initiate entity value: "..(err or "")}
+    end
+    ngx.log(ngx.DEBUG, "Table: "..tbl._name..", entityName: "..entityName..", record key: "..record.key..", record: "..(record and utils.toJson(record) or "NIL"))
+
+    local existingRecord = tbl:load({key = record.key}, conn)
+    if action == "update" then
+        if not existingRecord then
+            return {status="failed", message="Record not found", action=action, entityName=entityName, key=record.key}
+        end
+    end
+    local oldVals, newVals, persistErr = record:persist(conn, action == "delete")
+    if persistErr then
+        return {status="failed", message=persistErr, action=action, entityName=entityName, key=record.key}
+    end
+    if entityName == "ProductStore" then
+        eifo.store:load(conn) -- reload store information
+    end
+    if existingRecord then
+        existingRecord:_notify(oldVals, newVals)
+    else
+        record:_notify(oldVals, newVals)
+    end
+    return {status="success", message="ok", action=action, entityName=entityName, key=record.key}
+end
+
     -- 1. Read Request data:
 local readReqData = require "resty.reqargs"
-local getData, postData, fileData = readReqData()
+local getData, postData, _ = readReqData()
 local reqData = utils.mergeRef(getData, postData)
 if not reqData or utils.isTableEmpty(reqData) then
-    utils.responseError(ngx.HTTP_NO_CONTENT, "Request data is missing")
+    response( {error = "Request data is missing"}, ngx.HTTP_BAD_REQUEST)
     return
 end
 -- ngx.log(ngx.DEBUG, utils.toString(reqData, ": ", "\n"))
-
-local entityName = utils.popKey(reqData, "entityName")
-if not entityName then
-    utils.responseError(ngx.HTTP_BAD_REQUEST, "Entity Name is expected with key 'entityName'")
+local entityList = reqData["entities"]
+if not entityList then
+    response( {error = "Request data is missing"}, ngx.HTTP_BAD_REQUEST)
     return
 end
-
-local onAction = utils.popKey(reqData, "on")
-local viewableCat = utils.popKey(reqData, "viewable")
-local columnPrefix = utils.popKey(reqData, "columnPrefix")
-local tobeDeleted = utils.popKey(reqData, "delete")
-local storeId = utils.popKey(reqData, "storeId")
-ngx.ctx.lang = utils.popKey(reqData, "language") or "en"
-
---ngx.log(ngx.DEBUG, utils.toJson(eifo.db.table))
-ngx.status = ngx.HTTP_OK
-ngx.say("Thank you! Store: "..storeId.." have got the notification of "..entityName.." "..onAction )
-ngx.eof()
+ngx.ctx.lang = reqData["language"] or "en"
 
 local connFactory = eifo.db.conn
 local conn, errMsg = connFactory.redis()
 if not conn then
     ngx.log(ngx.CRIT, "Failed to get DB connection "..errMsg)
+    response( {error = "Internal server error "}, 500)
     return
 end
 local ok, error = conn:connect()
 if not ok then
     ngx.log(ngx.ERR, "Cannot get connection: "..(error or "unknown error"))
     conn:disconnect()
-    return
-end
-local tbl = eifo.db.table[entityName]:new({conn = conn})
-if not tbl then
-    ngx.log(ngx.CRIT, "Entity '" .. entityName .."' has no definition")
-    conn:disconnect()
-    return
-end
-local record, err = tbl:newRecord(reqData)
-
-if not record then
-    ngx.log(ngx.INFO, "Cannot initiate entity value: "..(err or ""))
-    conn:disconnect()
-    return
-end
-ngx.log(ngx.DEBUG, "Table: "..tbl._name..", entityName: "..entityName..", record key: "..record.key..", record: "..(record and utils.toJson(record) or "NIL"))
-
-local currentRecord = tbl:load({key = record.key}, conn)
-if not currentRecord and onAction == "update" then
-    ngx.log(ngx.INFO, "No current record found to update, record key: "..record.key)
-    conn:disconnect()
+    response( {error = "Internal server error "}, 500)
     return
 end
 
 local lockKey = "notifyChanges"
 conn:incr(lockKey)
-local oldVals, newVals, persistErr = record:persist(conn, tobeDeleted)
-if not persistErr then
-    if currentRecord then
-        currentRecord:_notify(oldVals, newVals)
+local resData = {}
+for i = 1, #entityList, 1 do
+    local entityData = entityList[i]
+    if type(entityData) == "table" and not utils.isTableEmpty(entityData) then
+        local result = updateRecord(entityData, conn)
+        table.insert(resData, result)
+        ngx.log(ngx.DEBUG, "Update result: "..utils.toJson(result))
     else
-        record:_notify(oldVals, newVals)
+        table.insert(resData, {status="failed", message="Entity data is missing or invalid"})
+        ngx.log(ngx.DEBUG, "Entity data is missing or invalid")
     end
-else
-    ngx.log(ngx.ERR, "Failed to updated: "..persistErr)
 end
+ngx.log(ngx.INFO, "Finished updating "..#entityList.." items")
+
 local num = conn:decr(lockKey)
 conn:disconnect()
+response( {results = resData}, ngx.HTTP_OK)
 
 
 local ipStr = ngx.shared.cluster:get("IPs")
@@ -96,36 +124,4 @@ if ipStr and type(ipStr) == 'string' then
 end
 ngx.shared.lock:flush_all()
 
-ngx.log(ngx.DEBUG, "Entity: "..entityName..", record key: "..record.key..((ok and "Updated successfully") or error or "Updated failed"))
 
-
---- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_001&productName=Demo%20One&description=For%Demo1
---- HASH type: "p:DEMO_001" --> {"productName": "Demo One", "description":"For%Demo1"}
---- LIST type: "new:p" --> {DEMO_001}
-
---- curl http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_002&productName=Demo%20Two&description=For%Demo2
---- HASH type: "p:DEMO_002" --> {"productName": "Demo Two", "description":"For%Demo2"}
---- LIST type: "new:p" --> {DEMO_002, DEMO_001}
-
-
-    --- TEST DATA ---
-    --- curl "http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcHome&productCategoryId=PopcHome&categoryName=Home%20Page&productCategoryTypeEnumId=PctCatalog"
-    --- curl "http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcBrowseRoot&productCategoryId=PopcBrowseRoot&categoryName=Browse%20Root&productCategoryTypeEnumId=PctCatalog"
-    --- curl "http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcAllProducts&productCategoryId=PopcAllProducts&categoryName=All&Products&productCategoryTypeEnumId=PctCatalog"
-    --- curl "http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcDeals&productCategoryId=PopcDeals&categoryName=Deals&productCategoryTypeEnumId=PctCatalog"
-    --- curl "http://localhost:8090/notifyChanges?entityName=ProductCategory&id=PopcNew&productCategoryId=PopcNew&categoryName=New%20Products&productCategoryTypeEnumId=PctCatalog"
-    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_001&productId=DEMO_001&productName=Demo%20One&description=For%Demo1&&imageLocation=%2Fimg%2FDEMO_001.webp"
-    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_002&productId=DEMO_002&productName=Demo%20Two&description=For%Demo2&imageLocation=%2Fimg%2FDEMO_002.webp"
-    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_003&productId=DEMO_003&productName=Demo%20Three&description=For%Demo3&imageLocation=%2Fimg%2FDEMO_003.webp"
-    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_004&productId=DEMO_004&productName=Demo%20Four&description=For%Demo4&imageLocation=%2Fimg%2FDEMO_004.webp"
-    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_005&productId=DEMO_005&productName=Demo%20Five&description=For%Demo5&imageLocation=%2Fimg%2FDEMO_005.webp"
-    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_006&productId=DEMO_006&productName=Demo%20Six&description=For%Demo6&imageLocation=%2Fimg%2FDEMO_006.webp"
-    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_007&productId=DEMO_007&productName=Demo%20Seven&description=For%Demo7&imageLocation=%2Fimg%2FDEMO_007.webp"
-    --- curl "http://localhost:8090/notifyChanges?entityName=Product&id=DEMO_008&productId=DEMO_008&productName=Demo%20Eight&description=For%Demo8&imageLocation=%2Fimg%2FDEMO_008.webp"
-
---- curl "http://localhost:8090/notifyChanges?entityName=ProductStorePromotion&id=PopcBuyGet&storePromotionId=PopcBuyGet&productStoreId=POPC_DEFAULT&itemDescription=Buy%201%20Get%201%20Half%20Off&serviceRegisterId=BuyGetDiscount&sequenceNum=10&requireCode=Y&useLimitPerOrder=2&useLimitPerCustomer=4&useLimitPerPromotion=10"
---- curl "http://localhost:8090/notifyChanges?entityName=ProductStorePromotion&id=PopcNewCustomer&storePromotionId=PopcNewCustomer&itemDescription=20%25%20Discount%20for%20New%20Customers"
-
---- curl "http://localhost:8090/notifyChanges?entityName=ProductCategoryMember&productCategoryId=PopcHome&productId=DEMO_001&fromDate=20231019"
---- curl "http://localhost:8090/notifyChanges?entityName=ProductCategoryMember&productCategoryId=PopcHome&productId=DEMO_002&fromDate=20231019"
-    -- ngx.sleep(30)

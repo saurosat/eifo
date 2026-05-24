@@ -15,7 +15,6 @@
     --]]%} 
 --> 
     
-{%  ngx.log(ngx.DEBUG, "Rendering /components/menu/buttonItem") %}
 <div x-data='new MenuItem( {*eifo.utils.toMenuItemJson(context) *}, $el )'>
    <div x-show="visible" class="mx-1 hover:bg-gray-200" @click.away="close()" >
       <button type="button" x-on:click="open()"

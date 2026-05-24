@@ -1,3 +1,4 @@
+local ngx = ngx
 ngx.log(ngx.INFO, "Loading eifo.db...")
 local utils = require "eifo.utils"
 local tables = {
@@ -34,12 +35,12 @@ local tables = {
             description = "TEXT WEIGHT 1.0"
         }
     },
-    {
-        name = "ProductContent",
-        prefix = "pcnt",
-        fnIds = {"productContentId"},
-        fnFKs = {productId = {"Product", "contents"}, productContentTypeEnumId={"Enumeration", "productContents"}}
-    },
+    -- {
+    --     name = "ProductContent",
+    --     prefix = "pcnt",
+    --     fnIds = {"productContentId"},
+    --     fnFKs = {productId = {"Product", "contents"}, productContentTypeEnumId={"Enumeration", "productContents"}}
+    -- },
     {
         name = "ProductAssoc",
         prefix = "pa",
@@ -101,31 +102,38 @@ local tables = {
         fnFKs = {productId = {"Product", "reviews"}}
     }
 }
-
-local tblsIndex = {
-    _initIndexes = function (self, conn)
-        local existingIndexes = nil
-        for _, tbl in pairs(self) do
-            existingIndexes = tbl:initIndex(conn, existingIndexes)
-        end
-    end
-}
-
 local Table = require "eifo.db.table.Table"
-local tbls = setmetatable({}, {__index = tblsIndex})
+local TableRegistry = { }
+
+function TableRegistry:add(tblInfo)
+    tblInfo.tblRegistry = self
+    local tbl = Table:new(tblInfo)
+    tbl._observers = {} -- set here so that all subclasses share the same observers object
+    -- self[tbl._name] = tbl --No need because tblRegistry has been set in tblInfo above
+end
+function TableRegistry:init()
+    for _, tbl in pairs(self) do
+        if type(tbl) =="table" then
+            for colName, joinInfo in pairs(tbl._leftCols) do
+                local tblName, alias = joinInfo[1], joinInfo[2]
+                local lTbl = self[tblName]
+                lTbl._rightCols[alias] = {tbl._name, colName}
+            end        
+        end
+
+    end
+end
+function TableRegistry:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
+end
+
+local tbls = TableRegistry:new({_indexInitialized = false})
 eifo.db.table = tbls
 for i = 1, #tables, 1 do
-    local tbl = Table:new(tables[i])
-    tbl._observers = {} -- set here so that all subclasses share the same observers object
-    tbls[tbl._name] = tbl
-    --ngx.log(ngx.DEBUG, tables[i].name.." --- "..tbl._name)
+    tbls:add(tables[i])
 end
-for i = 1, #tables, 1 do
-    local tbl = tbls[tables[i].name]
-    for colName, joinInfo in pairs(tbl._leftCols) do
-        local tblName, alias = joinInfo[1], joinInfo[2]
-        local lTbl = tbls[tblName]
-        lTbl._rightCols[alias] = {tables[i].name, colName}
-    end
-end
+tbls:init()
 return tbls

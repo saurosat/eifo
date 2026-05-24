@@ -1,11 +1,12 @@
 local utils = require "eifo.utils"
+local ngx = ngx
 
 local _record = {className = "Record", i18nCols = utils.ArraySet:new({"name", "title", "description", "shortDesc", "longDesc"})}
 local function __newIndex(self, key, value)
     local meta = getmetatable(self)
     if meta.i18nCols:index(key) then
-        local lang = (ngx.ctx.lang or eifo.lang or "en")
-        key = key.."."..lang
+        local lang = (ngx.var.lang or eifo.lang or "en")
+        key = key.."_"..lang
     end
     rawset(self, key, value)
 end
@@ -14,20 +15,20 @@ local function __equal(self, otherRecord)
     return self.key == otherRecord.key
 end
 local function __getByKey(self, sKey)
-    --ngx.log(ngx.DEBUG, "Querying key = "..key)
+    --utils.logDebug("Querying key = "..key)
     if type(sKey) ~= "string" then
         return nil
     end
     local meta = getmetatable(self)
     if meta.i18nCols:index(sKey) then
-        return rawget(self, sKey.."."..(ngx.ctx.lang or eifo.lang or "en"))
+        return rawget(self, sKey.."_"..(ngx.var.lang or eifo.lang or "en"))
     end
 
-    --ngx.log(ngx.DEBUG, "metatable: "..utils.toJson(meta))
-    --ngx.log(ngx.DEBUG, "className = "..meta.className)
+    --utils.logDebug("metatable: "..utils.toJson(meta))
+    --utils.logDebug("className = "..meta.className)
     local metaValue = meta[sKey]
     if metaValue then
-        --ngx.log(ngx.DEBUG, "key = "..key..", Returning metavalue: "..(type(metaValue) == "string" and metaValue or " object"))
+        --utils.logDebug("key = "..key..", Returning metavalue: "..(type(metaValue) == "string" and metaValue or " object"))
         return metaValue
     end
 
@@ -35,7 +36,7 @@ local function __getByKey(self, sKey)
     -- if sKey == "_table" then --> Redundant
     --     return _table
     -- end
-    --ngx.log(ngx.DEBUG, meta.className..".__getByKey "..key..", self.key: "..(rawget(self, "key") or "nil")..", meta._table = "..(_table and _table._name or "nil"))
+    --utils.logDebug(meta.className..".__getByKey "..key..", self.key: "..(rawget(self, "key") or "nil")..", meta._table = "..(_table and _table._name or "nil"))
     if _table then
         if sKey == "ids" then
             local fnIds = _table._fnIds
@@ -48,7 +49,7 @@ local function __getByKey(self, sKey)
         end
 
         local recordCommons = _table.recordCommons
-        --ngx.log(ngx.DEBUG, utils.toString(recordCommons))
+        --utils.logDebug(utils.toString(recordCommons))
         if recordCommons and recordCommons[sKey] then
             return recordCommons[sKey]
         end
@@ -57,12 +58,12 @@ local function __getByKey(self, sKey)
         if rightInfo then
             local rTable = _table._rightTables[rightInfo[1]] --> rightInfo[1] is table name
             if not rTable then
-                ngx.log(ngx.DEBUG, rightInfo[1].." rTable is nil: "..sKey)
+                utils.logDebug(rightInfo[1].." rTable is nil: "..sKey)
                 return nil
             end
             local colGroup = rTable.groupBy[rightInfo[2]] --> rightInfo[2] is joined column name
             if not colGroup then
-                ngx.log(ngx.DEBUG, "Table "..rightInfo[1]..", column "..rightInfo[2]..": groupBy is nil: "..sKey)
+                utils.logDebug("Table "..rightInfo[1]..", column "..rightInfo[2]..": groupBy is nil: "..sKey)
                 return nil
             end
             local group = colGroup[self.key]
@@ -104,7 +105,6 @@ function _record:new(tableObj, recordData)
         record = {key = recordData}
     elseif dataType == "table" then
         record = {}
-        local fnIds = tableObj._fnIds
         if #recordData > 0 then
             local ids = recordData
             record.key = tableObj:generateKey(ids)
@@ -126,10 +126,10 @@ function _record:new(tableObj, recordData)
                 end
             end
             local i18nCols = self.i18nCols
-            local lang = (ngx.ctx.lang or eifo.lang or "en")
+            local lang = (ngx.var.lang or eifo.lang or "en")
             for key, value in pairs(recordData) do
                 if i18nCols:index(key) then
-                    key = key.."."..lang
+                    key = key.."_"..lang
                 end
                 record[key] = value
             end
@@ -139,7 +139,7 @@ function _record:new(tableObj, recordData)
             end
         end
     else
-        error("invalid datatype: "..dataType..". Only hash, array and string is supported")
+        utils.logError("invalid datatype: "..dataType..". Only hash, array and string is supported")
     end
     
     local _mt = self:createSubClass({ _table = tableObj, __newIndex = __newIndex, __index = __getByKey, __eq = __equal, isLoaded = false})
@@ -194,7 +194,7 @@ function _record:load(conn)
     local eData = conn:hgetall(self.key)
     if not eData or utils.isTableEmpty(eData) then
         local err = "Entity key '"..self.key.."' not found in "..self._table._name
-        --ngx.log(ngx.DEBUG, err)
+        --utils.logDebug(err)
         return nil, err
     end
 
@@ -245,11 +245,11 @@ function _record:deleteFields(conn, fields, nocommit)
 end
 function _record:save(conn, nocommit)
     --assert(not self._table.evs, "Trying to update a read-only entity: "..self._table._name)
-    --ngx.log(ngx.DEBUG, "self['key'] = "..utils.toString(self["key"]))
+    --utils.logDebug("self['key'] = "..utils.toString(self["key"]))
     local oldVals, err, newVals = conn:hset(self["key"], self)
     if err then 
         conn:rollback()
-        ngx.log(ngx.ERR, "Failed to save: "..err)
+        utils.logError("Failed to save: "..err)
         return nil, nil, "Failed to save: "..err
     end
     if utils.isTableEmpty(newVals) then --case ignore update
@@ -260,18 +260,18 @@ function _record:save(conn, nocommit)
     end
     local ok, errMsg = self:updateParents(newVals, oldVals, conn)
     if errMsg then
-        ngx.log(ngx.ERR, errMsg)
+        utils.logError(errMsg)
     end
     if not ok then
-        ngx.log(ngx.DEBUG, "Error: "..(errMsg or "Unknown reason"))
+        utils.logDebug("Error: "..(errMsg or "Unknown reason"))
         if not nocommit then
-            ngx.log(ngx.DEBUG, "Rollback key "..self["key"])
+            --utils.logDebug("Rollback key "..self["key"])
             conn:rollback()            
         end
         return nil, nil, errMsg
     end
     if not nocommit then
-        ngx.log(ngx.DEBUG, "Commit key "..self["key"])
+        --utils.logDebug("Commit key "..self["key"])
         conn:commit()            
     end
     if oldVals and next(oldVals) then
@@ -322,8 +322,8 @@ function _record:persist(conn, tobeDeleted, nowEpoch)
     local oldVals, newVals, err
     if not tobeDeleted then
         local thruDate = self.thruDate
-        if thruDate then
-            ngx.log(ngx.DEBUG, "thruDate = "..thruDate)
+        if thruDate and thruDate ~= "_NA_" then
+            --utils.logDebug("thruDate = "..thruDate)
             local thruEpoch = utils.timeFromDbStr(thruDate)
             if thruEpoch < nowEpoch then
                 tobeDeleted = true -- expired
@@ -339,7 +339,7 @@ function _record:persist(conn, tobeDeleted, nowEpoch)
 end
 local function notifyAll(records, observers, oldVals, newVals)
     for _, v in pairs(observers) do
-        --ngx.log(ngx.DEBUG, "Receiver: "..utils.toString(v, ": ", "\r\n"))
+        --utils.logDebug("Receiver: "..utils.toString(v, ": ", "\r\n"))
         v:_update(records, oldVals, newVals)
     end
     local record = records[1]
@@ -355,7 +355,7 @@ local function notifyAll(records, observers, oldVals, newVals)
                 local leftObservers = lTbl._observers
                 notifyAll({lRecord, table.unpack(records)}, leftObservers, oldVals, newVals)
             else
-                ngx.log(ngx.DEBUG, lRecordName.." is not found. Key: "..(record[colName] or "nil"))
+                utils.logDebug(lRecordName.." is not found. Key: "..(record[colName] or "nil"))
             end
         end
     end
@@ -363,7 +363,7 @@ end
 function _record:_notify(oldVals, newVals)
     local observers = self._table._observers or {}
     -- if not observers or not next(observers) then
-    --     ngx.log(ngx.DEBUG, self._table._name.." updated. No observers")
+    --     utils.logDebug(self._table._name.." updated. No observers")
     --     return true
     -- end
     notifyAll({self}, observers, oldVals, newVals)

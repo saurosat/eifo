@@ -10,6 +10,8 @@
     <meta name="keywords" content="clothes, cross border, VN, Vietnam, Viet Nam, US, America">
 
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Work+Sans:200,400&display=swap">
+     <!-- <link rel="stylesheet" href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css"/>
+    <link href="master.css" rel="stylesheet"> -->
     <link rel="stylesheet" href="/gleecy.css" />
 
 
@@ -88,8 +90,30 @@
 
     </svg>
     <nav class="flex flex-row flex-wrap items-center justify-items-start justify-between w-full mx-auto max-w-7xl px-2 pb-2 sm:px-4 md:h-16 bg-gray-800" >
+        <!-- language, signin, orders, returns section) -->
+        <div class="order-1 md:order-3 relative md:flex md:flex-row md:flex-grow" x-data="new MenuItem({expanded: false}, $el)" 
+                x-init="expanded = (window.innerWidth >= 768)" x-resize.document="expanded = ($width >= 768)">
+            <button type="button" x-on:click="toggle()"
+                class="relative inline-flex md:hidden items-center justify-center rounded-md text-gray-400">
+                <span class="absolute -inset-0.5" id="hamburg-span"></span>
+                <span class="sr-only">Open main menu</span>
+                <svg x-show="isOpen" class="h-6 w-6" aria-hidden="true"  fill="none" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                    <use href="#hamburgerClose"></use>
+                </svg>
+                <svg x-show="!isOpen" class="h-6 w-6" aria-hidden="true"  fill="none" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                    <use href="#hamburgerOpen"></use>
+                </svg>
+            </button>
+            <div x-show="expanded || isOpen" 
+                    class="flex flex-nowrap md:justify-end md:ml-auto md:relative md:border-none max-md:absolute max-md:top-0 max-md:right-full md:flex-row max-md:flex-col max-md:z-10 max-md:min-w-20 max-md:mt-2 max-md:rounded-md max-md:bg-white max-md:shadow-lg max-md:ring-1 max-md:ring-gray-900/5">
+{%  for i = 1, #mainMenuItems do %}
+                {(/components/menu/item, mainMenuItems[i])}
+{%  end %}
+            </div>
+        </div>
+
         <!--Logo etc-->
-        <div class="order-1 h-10 flex flex-none items-center justify-items-start justify-between">
+        <div class="order-2 md:order-1 h-10 flex flex-none items-center justify-items-start justify-between">
             <!-- logo section -->
             <div class="flex-shrink-0">
                 <!--  <img class="h-8 w-auto" src="https://tailwindui.com/img/logos/mark.svg?color=indigo&shade=500" alt="Your Company"> -->
@@ -97,47 +121,7 @@
             </div>
         </div>
 
-        <div x-data="searchObj"
-            class="order-3 md:order-2 max-md:w-5/6 flex-grow items-center justify-items-stretch border-t md:border-none border-gray-700 px-2 flex flex-row flex-nowrap ">
-            <div class="w-full max-w-md">
-                <label for="search" class="sr-only">Search</label>
-                <div class="relative items-baseline flex w-full">
-                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                        <svg class="h-5 w-5 text-gray-400" aria-hidden="true">
-                            <use xlink:href="#search1"></use>
-                        </svg>
-                    </div>
-                    <input id="search" name="search" class="block w-full rounded-md border-0 bg-gray-700 py-1.5 pl-12 pr-3 text-gray-300 placeholder:text-gray-400 focus:bg-white focus:text-gray-900 focus:ring-0 sm:text-sm sm:leading-6" placeholder="Search" type="search">
-                </div>
-            </div>
-        </div>
-
-        <div class="order-4 flex flex-none flex-row flex-nowrap justify-end justify-items-end items-center">
-            <!-- language, signin, orders, returns section) -->
-            <div class="relative md:flex md:flex-row" x-data="new MenuItem({expanded: false}, $el)" 
-                 x-init="expanded = (window.innerWidth >= 768)" x-resize.document="expanded = ($width >= 768)">
-                <button type="button" x-on:click="toggle()"
-                    class="relative inline-flex md:hidden items-center justify-center rounded-md text-gray-400">
-                    <span class="absolute -inset-0.5" id="hamburg-span"></span>
-                    <span class="sr-only">Open main menu</span>
-                    <svg x-show="isOpen" class="h-6 w-6" aria-hidden="true"  fill="none" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-                        <use href="#hamburgerClose"></use>
-                    </svg>
-                    <svg x-show="!isOpen" class="h-6 w-6" aria-hidden="true"  fill="none" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-                        <use href="#hamburgerOpen"></use>
-                    </svg>
-                </button>
-                <div x-show="expanded || isOpen" 
-                     class="flex flex-nowrap md:relative max-md:absolute max-md:top-0 max-md:right-full md:flex-row max-md:flex-col max-md:z-10 max-md:min-w-20 max-md:mt-2 max-md:rounded-md max-md:bg-white max-md:shadow-lg max-md:ring-1 max-md:ring-gray-900/5">
-{%  for i = 1, #mainMenuItems do 
-        ngx.log(ngx.INFO, "mainMenuItems[i] = ", eifo.utils.toJson(mainMenuItems[i])) 
-    %}
-                {(/components/menu/item, mainMenuItems[i])}
-{%  end %}
-                </div>
-            </div>
-        </div>
-        <div class="order-2 md:order-4 ml-3 flex flex-none max-md:flex-grow flex-row flex-nowrap justify-end justify-items-end items-center">
+        <div class="order-3 md:order-4 flex flex-none flex-row flex-nowrap justify-end justify-items-end items-center">
             <!-- notification bell section -->
             <div x-data="{notifications: window.userAccount.notifications}">
                 <button type="button" class="relative ml-auto flex-shrink-0 rounded-full bg-gray-800 p-1 text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800">
@@ -151,6 +135,19 @@
             <!-- login icon section -->
             <div class="flex-shrink-0">
                 <img class="h-8 md:h-10 w-8 md:w-10 rounded-full" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="">
+            </div>
+        </div>
+
+        <div x-data="searchObj"
+            class="order-4 md:order-2 max-md:w-full md:w-1/2 flex-grow items-center justify-items-stretch border-t md:border-none border-gray-700 px-2 flex flex-row flex-nowrap ">
+            <label for="search" class="sr-only">Search</label>
+            <div class="relative items-baseline flex w-full">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <svg class="h-5 w-5 text-gray-400" aria-hidden="true">
+                        <use xlink:href="#search1"></use>
+                    </svg>
+                </div>
+                <input id="search" name="search" class="block w-full rounded-md border-0 bg-gray-700 py-1.5 pl-12 pr-3 text-gray-300 placeholder:text-gray-400 focus:bg-white focus:text-gray-900 focus:ring-0 sm:text-sm sm:leading-6" placeholder="Search" type="search">
             </div>
         </div>
     </nav>

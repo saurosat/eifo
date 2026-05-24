@@ -1,3 +1,4 @@
+/* @import url("https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css"); */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -150,4 +151,16 @@
 }
 .btn_small:hover {
     background-color: powderblue;
+}
+
+/* Hide the scrollbar for this container */
+.sm:overflow-x-auto::-webkit-scrollbar {
+    display: none;
+}
+.hide-scroll-bar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.hide-scroll-bar::-webkit-scrollbar {
+    display: none;
 }

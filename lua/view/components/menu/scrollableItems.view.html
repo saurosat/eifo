@@ -1,6 +1,6 @@
 <div x-data
      class="relative w-full bg-white border-gray-700 pb-3 pt-4 m-auto">
-    <div class="flex flex-row flex-nowrap items-start overflow-x-scroll hide-scroll-bar">
+    <div class="flex flex-row flex-nowrap items-start overflow-x-scroll hide-scroll-bar ">
 {%  for i = 1, #menuItems do %}
         <!-- Apparel -->
         <div class="inline-block px-3">
@@ -13,9 +13,9 @@
                 </svg>
             </button>
 {%      elseif context.href then %} 
-            {(/components/menu/linkItem, context)}
+            {(/components/menu/linkItem, menuItems[i])}
 {%      else %}
-            {(/components/menu/buttonItem, context)}
+            {(/components/menu/buttonItem, menuItems[i])}
 {%      end %}  
         </div>
 {%  end %}  
